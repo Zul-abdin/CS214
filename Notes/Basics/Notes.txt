@@ -1,0 +1,8 @@
+How code is made into an executable:
+
+Preprocessor -> Compile -> Linking -> Assembly
+
+Preprocessor: Resolves your header files.
+Compile: Compiles your code, but not stuff that is called from a library
+Linking: Links code used from libraries that you just reference
+Assembly: Code is turned into assembly and made into an executable
