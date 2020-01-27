@@ -49,7 +49,7 @@ int main(int argc, char* argv[]) {
     };
 
     //Initializing a struct takes values of variables left-right & top-bottom
-    struct thing someStuff = {1, 'e', '1.49'};
+    struct thing someStuff = {1, 'e', 1.49};
     someStuff.anInt = 4;
 
     printf("h%cllo %d \n", someStuff.achar ,someStuff.anInt);
