@@ -1,9 +1,20 @@
 //
 // Created by Zain on 1/23/20.
 //
+/*
+ * Header Files
+ * - Text Replacement Mechanisms (ex. Will not evaluate subexpressions within macro inputs)
+ *   > Definitions (#define) enum, struct, union, typedef
+ *   > Macros - Definitions with variables
+ *
+ * - Conventions
+ *   > all defs in caps
+ *   > ifndef guard at top of file
+ */
 
-#ifndef _BASICHEADER_H //if not defined (not included)
-#define _BASICHEADER_H //define and include it
+// ifndef Guard - prevents running/processing your header files more than once
+#ifndef _BASICHEADER_H //if "_BASICHEADER_H" not defined (not existing)
+#define _BASICHEADER_H //define it
 
 #endif //_BASICHEADER_H
 

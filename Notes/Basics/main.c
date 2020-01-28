@@ -31,7 +31,7 @@ int main(int argc, char* argv[]) {
     stuff somethingImportant;
 
     //A struct defines a single name for a collection of fields
-    //Structs have different memory sizes per element, unlike an array. Therefore you cannot reference them by indexing.
+    //Structs may have different memory sizes per element, unlike an array. Therefore you cannot reference them by indexing.
     //Stores each data type in a distinct chunk of memory
     struct thing {
         int anInt;
@@ -39,8 +39,9 @@ int main(int argc, char* argv[]) {
         double someDecimal;
     };
 
-    //Different from struct in that it stores all data in one piece of memory
-    //Only enough data for the largest data type is allocated
+    //Different from struct in that it stores all data shared in one piece of memory
+    //Changing one element changes all
+    //Minimum size of union is the size of the largest data type
     //Used for pooling in large amounts data or interpreting the same bytes as differet types
     union diff {
         int anInt;
