@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.15)
-project(Lec2 C)
+project(Pointers C)
 
 set(CMAKE_C_STANDARD 90)
 
-add_executable(Lec2 main.c)
+add_executable(Pointers main.c)
