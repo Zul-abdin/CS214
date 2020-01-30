@@ -6,9 +6,10 @@ int main(int argc, char* argv[]) {
     /*
      * Arrays (assume an array named arr)
      * - Arrays are stored in sequential order in memory
-     * - To mechanically index through an array, to get the element an index, do: index * sizeof(type of array)
+     * - To mechanically index through an array, to get the element in an index,
+     *   - do: index * sizeof(type of arr) to get how far in memory from the first element that index is
      * - The name of the array is a pointer to the address of the first element in the array in memory, whether it be a[0], a[0][0], ...
-     * - So, doing: arr + (index * sizeof(type of array))
+     * - So, doing: arr + (index * sizeof(type of array)) gives memory location of that index, because arr is a pointer to an address
      * - For a 1-D array: arr IS a pointer, but arr[0] is NOT
      */
     char thisIsAString[] = {'s', 't', 'r', 'i', 'n', 'g', '\0'};
@@ -23,6 +24,10 @@ int main(int argc, char* argv[]) {
     printf("%p\n",&thisIsAString[3]);
     printf("%p\n",thisIsAString + 3);
 
+    printf("~~~~~~~~~~~~~~~~~~~~~~~~\n");
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
     /*
      * Pointers
      * - A memory address (of something whose size is known)
@@ -35,6 +40,11 @@ int main(int argc, char* argv[]) {
 
     char* p = &(test1[0]);
 
+    printf("test0 -> %p\n", test0);
+    printf("%p + %lu = %p\n", test0, 3 * sizeof(char), (test0 + (3 * sizeof(char))));
+    printf("%p -> %c\n", (test0 + (3 * sizeof(char))), *(test0 + (3 * sizeof(char))));
+    printf("test0[3] = %c\n", test0[3]);
+
     //Print what p is pointing to
     printf("%c\n", *p);
 
@@ -42,7 +52,8 @@ int main(int argc, char* argv[]) {
     //Common error: p = 'f'; (Makes the address p be 'f', treating 'f' as an address rather than a char)
     *p = 'f';
 
-    printf("%c\n~~~~~~~~~~~~~~~~~~~~~~~~\n", test1[0]);
+    printf("%c\n", test1[0]);
+    printf("~~~~~~~~~~~~~~~~~~~~~~~~\n");
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
