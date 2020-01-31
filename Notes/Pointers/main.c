@@ -110,17 +110,29 @@ int main(int argc, char* argv[]) {
     //4 bytes of memory given to a
     int a = 0;
 
-    //Making a char pointer and setting it to the address of a, treated as a char pointer
+    /*
+     * Making a char pointer and setting it to the address of a, treated as a char pointer
+     * Remember: an array's variable is just a pointer to the address to the first element of the array
+     * So, in order to make the int a into a char array, po, we need po to point to the first char, so where a starts
+     * This means we need po to point to the address of a, and &a will be the address of the beginning of the int.
+     */
     char* po = (char*) &a;
 
     //4 chars can fit into an int, so this should work
     //Remember - po points to the address of a, casted to a char array (char pointer)
+
+
     po[0] = 'h';
     po[1] = 'i';
     po[2] = '!';
     po[3] = '\0';
 
     printf("%s\n", po);
+    printf("%d\n", a);
+
+    int hi = 2189672;
+
+    printf("%s", (char*) &hi);
 
     return 0;
 }
