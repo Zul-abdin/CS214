@@ -1,6 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+int function (int stuff){
+    return stuff;
+}
+
 int main(int argc, char* argv[]) {
 
     /*
@@ -132,7 +136,59 @@ int main(int argc, char* argv[]) {
 
     int hi = 2189672;
 
-    printf("%s", (char*) &hi);
+    printf("%s\n", (char*) &hi);
+
+    printf("~~~~~~~~~~~~~~~~~~~~~~~~\n");
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    /*
+     * Function pointers are collective names for instructions in memory, stored in an address
+     * You can now pass around functions.
+     * This is useful when outputting things as void* and casting the output to the desired type when building type-generic programs.
+     */
+
+    //Pointer to the function that returns an int and takes an int as a parameter
+    //functionPointer is the name of the function pointer and the type takes into account parameters and return types
+    //But you still have to set it to the right set of instructions, "= function"
+    int (*functionPointer)(int)= function;
+
+    //Calling function using pointer
+    printf("%d\n", functionPointer(4));
+
+    printf("~~~~~~~~~~~~~~~~~~~~~~~~\n");
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    /*
+     * IO
+     * - Is often memory-mapped
+     *   - i.e. some virtual address 'means' the device
+     * - Non-blocking vs blocking Requests
+     *   - Blocking: the next line will only run when when the function returns
+     *   - Non-blocking: next line may run after a partial run of the function
+     *   - IO is so slow that they are sometimes it uses Non-blocking requests
+     *     - Therefore you should ALWAYS check the return value of IO functions you use to check for partial successes
+     * - Handling Errors
+     *   - Check errno immediately after the error
+     *   - Can use perror in terminal or strerror in your code
+     *
+     * File Descriptor
+     * - An IO pointer
+     *   - An abstraction to represent something outside your code you can read/write from/to
+     * - Used to:
+     *   - Open, Close, Read, Write
+     *     - To check man pages, look in chapter 2 or 3 by doing:
+     *       - man 2 read
+     *
+     * Read(int fd, void *buff, size_t count)
+     * - Attempts to read up to count bytes from the file descriptor, fd, into the buffer, *buff
+     * - in <unistd.h> library
+     * - Returns:
+     *   - Number of bytes read if successful
+     *     - This means that if you want to read 100 bytes it might return less than 100 bytes because it wasnt able to read the rest
+     *   - 0 if you reached the EOF (end of file)
+     */
 
     return 0;
 }
