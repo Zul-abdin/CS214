@@ -55,4 +55,5 @@ dkms.conf
 *.idea
 cmake-build-debug*
 
-#Binary Files
+#Bin Folders
+bin/
