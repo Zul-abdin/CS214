@@ -3,4 +3,4 @@ project(IO C)
 
 set(CMAKE_C_STANDARD 90)
 
-add_executable(IO main.c)
+add_executable(IO main.c test.c)

@@ -2,7 +2,7 @@
 #include <fcntl.h>
 #include <zconf.h>
 
-int main() {
+int main(int argc, char* argv[]) {
 
     /*
      * IO
