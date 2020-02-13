@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <zconf.h>
+#include <string.h>
 
 int main(int argc, char* argv[]) {
 
@@ -55,6 +56,7 @@ int main(int argc, char* argv[]) {
      * - But we need persistent storage to store the location of dick blocks and files
      *   - Such metadata is stored in a special section of the HDD
      * - Data needed to access files stored in "i-nodes"
+     *   - Meta-data for the disk blocks
      *   - Info needed to access a file
      *     - List of disk blocks that make up the file
      *     - Access mode of file
@@ -83,6 +85,31 @@ int main(int argc, char* argv[]) {
         printf("%c", buffer);
     }
     printf("\n");
+
+    printf("~~~~~~~~~~~~~~~~~~~~~~~~\n");
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    int fd1 = open("./main.c", O_RDONLY);
+
+    //Making a buffer for a 100-character string, initially setting everything to the null-terminator
+
+    char buffer1[101];
+    memset(buffer1, '\0', 101);
+
+    int status;
+    int readIn = 0;
+
+    do{
+        status = read(fd1, buffer1 + readIn, 100 - readIn);
+        readIn += status;
+
+    } while(status > 0 && readIn < 100);
+
+    printf("%s", buffer1);
+    printf("%c", '\n');
+
+
 
     return 0;
 }
