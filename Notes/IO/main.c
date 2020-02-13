@@ -51,7 +51,7 @@ int main(int argc, char* argv[]) {
      * - ".." to go back one directory
      * - start with a "/" to signify an absolute path
      *
-     * File Storage
+     * File Storage & Directories
      * - HDD only stores bytes, in disk blocks
      * - But we need persistent storage to store the location of dick blocks and files
      *   - Such metadata is stored in a special section of the HDD
@@ -61,6 +61,11 @@ int main(int argc, char* argv[]) {
      *     - List of disk blocks that make up the file
      *     - Access mode of file
      *     - Info about the file (eg. File name, creation date, last used, ...)
+     *   - Meta-data for files is the same as the meta-data for directories
+     *     - The only difference is what the i-nodes will point to
+     *       - In the case of files, the i-nodes have pointers to disk blocks
+     *       - in the case of directories, the i-nodes have pointers to other i-nodes
+     *     - So i-nodes can implement both files AND directories
      *   - Use pointers to allow for multiple sized files
      *
      */
@@ -110,6 +115,9 @@ int main(int argc, char* argv[]) {
     printf("%c", '\n');
 
 
+    printf("~~~~~~~~~~~~~~~~~~~~~~~~\n");
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     return 0;
 }
