@@ -8,17 +8,20 @@
 typedef struct _stringNode_{
     char* name;
     struct _stringNode_* next;
+    struct _stringNode_* prev;
 }stringNode;
 
 typedef struct _numberNode_{
     int value;
     struct _numberNode_* next;
+    struct _numberNode_* prev;
 }numberNode;
 
 void readingFile(int fd, char* buffer, int bytesToRead);
 stringNode* tokenCreator(int size);
 stringNode* tokenCreator(int size);
-stringNode* initalization(char* buffer, char* delimiters, int buffersize, int delimitersize);
+stringNode* initalization(char* buffer, char* delimiters, int buffersize, int delimitersize, int filedescriptor, int bytesToRead);
+void printLL(stringNode* head);
 
 int sequentialSort(void* toSort, int (*comparator)(void*, void*)){
     int arrayLength = sizeof(toSort)/sizeof(toSort[0]);
@@ -60,7 +63,7 @@ void readingFile(int fd, char* buffer, int bytesToRead){
     do{
         int status = read(fd, &buffer[position], bytesToRead-bytesRead);
         if(status == 0){
-            printf("Finished reading the File\n");
+            printf("File Reading finished or Buffer is full\n");
             break;
         }else if(status == -1){
             printf("Error in the file reading\n");
@@ -75,33 +78,41 @@ stringNode* tokenCreator(int size){
     newNode->name = (char*) malloc(sizeof(char) * size);
     memset(newNode->name, '\0', sizeof(char) * size);
     newNode->next = NULL;
+    newNode->prev = NULL;
     return newNode;
 } //Change to generic so it can generate numberNodes
 
-stringNode* initalization(char* buffer, char* delimiters, int buffersize, int delimitersize){
+stringNode* initalization(char* buffer, char* delimiters, int buffersize, int delimitersize, int filedescriptor, int bytesToRead){
      int position = 0;
      int bufferPos;
      stringNode* head = tokenCreator(20);
      stringNode* curNode = head;
-     for(bufferPos = 0; bufferPos < (buffersize/sizeof(buffer[0])); ++bufferPos){
-        int temp = 0;
-        int isDelimiter = 0;
-        for(temp = 0; temp < (delimitersize/sizeof(delimiters[0])); ++temp){
-            if(buffer[bufferPos] == delimiters[temp]){
-                isDelimiter = 1;
-                break;
+     do{
+        memset(buffer, '\0', bytesToRead * sizeof(char));
+        readingFile(filedescriptor, buffer, bytesToRead);
+        for(bufferPos = 0; bufferPos < (buffersize/sizeof(buffer[0])); ++bufferPos){
+            int temp = 0;
+            int isDelimiter = 0;
+            for(temp = 0; temp < (delimitersize/sizeof(delimiters[0])); ++temp){
+                if(buffer[bufferPos] == delimiters[temp]){
+                    isDelimiter = 1;
+                    break;
+                }
+            }
+            if(isDelimiter && curNode->name[0] != '\0'){
+                stringNode* newNode = tokenCreator(20);
+
+                curNode->next = newNode;
+                newNode->prev = curNode;
+
+                curNode = newNode;
+                position = 0;
+            }else{
+                curNode->name[position] = buffer[bufferPos];
+                position++; 
             }
         }
-        if(isDelimiter && curNode->name[0] != '\0'){
-            stringNode* newNode = tokenCreator(20);
-            curNode->next = newNode;
-            curNode = newNode;
-            position = 0;
-        }else{
-            curNode->name[position] = buffer[bufferPos];
-            position++; 
-        }
-     }
+    }while(buffer[0] != '\0');
     return head;
 } /* To add: make the name of the stringnodes be infinite long. 
 Concept: Double the size of the char[] and memset the characters to the newly doubled array size (Inefficient?)
@@ -128,10 +139,23 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
-    
+    char delimiters[1] = {','};
+    char buffer[100] = {'\0'};
+    int bytesToRead = sizeof(buffer);
+    stringNode* head = initalization(buffer, delimiters, sizeof(buffer), sizeof(delimiters), filedescriptor, bytesToRead);
+
+    printLL(head);
+  
+
     if(close(filedescriptor) < 0){
         printf("File Descriptor would not close\n");
     }
     return 0;
 }
 
+void printLL(stringNode* head){
+    while(head != NULL){
+        printf("%s\n", head->name);
+        head = head->next;
+    }
+}
