@@ -61,7 +61,7 @@ int main(int argc, char* argv[]) {
     printf("The LL(Tokens) for the file is:\n");
 	printLL(head);
 	
-	
+	printf("\n");
 	numberNode* nhead = NULL;
 
 	if(isdigit(head->value[0]) > 0){
@@ -72,14 +72,14 @@ int main(int argc, char* argv[]) {
 		head = NULL;
 		nhead = curNNode;
 
-		while(curNode->next != NULL){
+		while(curNode != NULL){
 			curNNode->value = atoi(curNode->value);
-
-			numberNode* temp = numberCreator();
-			curNNode->next = temp;
-			temp->prev = curNNode;
-			curNNode = temp;
-
+            if(curNode->next  != NULL){
+                numberNode* temp = numberCreator();
+			    curNNode->next = temp;
+			    temp->prev = curNNode;
+			    curNNode = temp;
+            }
 			stringNode* toFree = curNode;
 			curNode = curNode->next;
 			freeSNode(toFree);
@@ -119,7 +119,13 @@ void printLL(stringNode* head){
 }
 
 int intCompare(void* arg1, void* arg2){
-    return (arg1 - arg2);
+    if(arg1 == arg2){
+        return 0;
+    }else if(arg1 < arg2){
+        return -1;
+    }else{
+        return 1;
+    }
 }
 
 int strcomp(void* arg1, void* arg2){
@@ -192,10 +198,10 @@ stringNode* initalization(char* buffer, char* delimiters, int buffersize, int de
                 
                 curNode = newNode;
 
-            }else if(isDelimiter){
+            }else if(isDelimiter || isalnum(buffer[bufferPos]) == 0){
                 continue;
             }else{
-                if(position >= defaultSize && isspace(buffer[bufferPos]) == 0){
+                if(position >= defaultSize){
                     defaultSize = defaultSize * 2;
 
                     char* expanded = (char*) malloc(sizeof(char) * defaultSize);
@@ -206,10 +212,8 @@ stringNode* initalization(char* buffer, char* delimiters, int buffersize, int de
                     free(curNode->value);
                     curNode->value = expanded;
                 }
-                if(isspace(buffer[bufferPos]) == 0){
-                    curNode->value[position] = buffer[bufferPos];
-                    position++; 
-                }
+                curNode->value[position] = buffer[bufferPos];
+                position++; 
             }
         }
         memset(buffer, '\0', bytesToRead * sizeof(char));
