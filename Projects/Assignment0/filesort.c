@@ -83,11 +83,12 @@ stringNode* tokenCreator(int size){
 } //Change to generic so it can generate numberNodes
 
 stringNode* initalization(char* buffer, char* delimiters, int buffersize, int delimitersize, int filedescriptor, int bytesToRead){
-     int position = 0;
-     int bufferPos;
-     stringNode* head = tokenCreator(20);
-     stringNode* curNode = head;
-     do{
+    int defaultSize = 20;
+    int position = 0;
+    int bufferPos;
+    stringNode* head = tokenCreator(defaultSize);
+    stringNode* curNode = head;
+    do{
         memset(buffer, '\0', bytesToRead * sizeof(char));
         readingFile(filedescriptor, buffer, bytesToRead);
         for(bufferPos = 0; bufferPos < (buffersize/sizeof(buffer[0])); ++bufferPos){
@@ -100,16 +101,29 @@ stringNode* initalization(char* buffer, char* delimiters, int buffersize, int de
                 }
             }
             if(isDelimiter && curNode->name[0] != '\0'){
-                stringNode* newNode = tokenCreator(20);
+                stringNode* newNode = tokenCreator(defaultSize);
 
                 curNode->next = newNode;
                 newNode->prev = curNode;
 
                 curNode = newNode;
                 position = 0;
+                defaultSize = 20;
             }else{
+                if(position >= defaultSize){
+                    defaultSize = defaultSize * 2;
+
+                    char* expanded = (char*) malloc(sizeof(char) * defaultSize);
+                    memset(expanded, '\0', defaultSize * sizeof(char));
+
+                    memcpy(expanded, curNode->name, defaultSize/2);
+
+                    free(curNode->name);
+                    curNode->name = expanded;
+                }
                 curNode->name[position] = buffer[bufferPos];
                 position++; 
+                
             }
         }
     }while(buffer[0] != '\0');
@@ -117,8 +131,10 @@ stringNode* initalization(char* buffer, char* delimiters, int buffersize, int de
 } /* To add: make the name of the stringnodes be infinite long. 
 Concept: Double the size of the char[] and memset the characters to the newly doubled array size (Inefficient?)
 
-To Add: Concept for File Reading: READ TILL you find delimiter once find delimiter, store. 
-Currently, file reading will parse only 100 words each.
+To add: Smart parsing (if it is a number, be able to store it into the numberLL etc.) Currently only works for strings
+To add: removal of whitespace
+To add: ensure the name[] can be infinitely long
+
  */
 
 int main(int argc, char* argv[]) {
@@ -143,7 +159,6 @@ int main(int argc, char* argv[]) {
     char buffer[100] = {'\0'};
     int bytesToRead = sizeof(buffer);
     stringNode* head = initalization(buffer, delimiters, sizeof(buffer), sizeof(delimiters), filedescriptor, bytesToRead);
-
     printLL(head);
   
 
