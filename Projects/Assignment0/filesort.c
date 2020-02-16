@@ -22,6 +22,11 @@ stringNode* tokenCreator(int size);
 stringNode* tokenCreator(int size);
 stringNode* initalization(char* buffer, char* delimiters, int buffersize, int delimitersize, int filedescriptor, int bytesToRead);
 void printLL(stringNode* head);
+void freeSNode(stringNode* node);
+void printNLL(numberNode* head);
+numberNode* numberCreator();
+
+
 
 int sequentialSort(void* toSort, int (*comparator)(void*, void*)){
     int arrayLength = sizeof(toSort)/sizeof(toSort[0]); //This will not work since toSort will be a pointer to the start of the array so the size will be 8 instead of the size of the array (FIX LATER)
@@ -178,8 +183,43 @@ int main(int argc, char* argv[]) {
     char buffer[100] = {'\0'};
     int bytesToRead = sizeof(buffer);
     stringNode* head = initalization(buffer, delimiters, sizeof(buffer), sizeof(delimiters), filedescriptor, bytesToRead);
-    printLL(head);
-  
+    printf("The LL for the stringNode is:\n");
+	printLL(head);
+	
+	
+	numberNode* nhead = NULL;
+
+	if(isdigit(head->name[0]) > 0){
+		stringNode* curNode = head;
+        numberNode* curNNode = numberCreator();
+
+		head = NULL;
+		nhead = curNNode;
+
+		while(curNode->next != NULL){
+			curNNode->value = atoi(curNode->name);
+
+			numberNode* temp = numberCreator();
+			curNNode->next = temp;
+			temp->prev = curNNode;
+			curNNode = temp;
+            
+			stringNode* toFree = curNode;
+			curNode = curNode->next;
+			freeSNode(toFree);
+		}
+	}
+	
+	printf("The LL for the numberNode is:\n");
+	printNLL(nhead);
+	
+	
+	printf("The LL for the stringNode is:\n");
+	printLL(head);
+    
+
+
+
 
     if(close(filedescriptor) < 0){
         printf("File Descriptor would not close\n");
@@ -192,4 +232,29 @@ void printLL(stringNode* head){
         printf("%s\n", head->name);
         head = head->next;
     }
+}
+
+void printNLL(numberNode* node){
+    while(node != NULL){
+        printf("Value: %d\n", node->value);
+        node = node->next;
+    }
+}
+
+void freeSNode(stringNode* node){
+    free(node->name);
+    if(node->prev != NULL){
+        node->prev->next = node->next;
+    }
+    if(node->next != NULL){
+        node->next->prev = node->prev;
+    }
+}
+
+numberNode* numberCreator(){
+    numberNode* newNode = (numberNode*) malloc(sizeof(numberNode) * 1);
+    newNode->value = 0;
+    newNode->next = NULL;
+    newNode->prev = NULL;
+    return newNode;
 }
