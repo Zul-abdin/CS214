@@ -24,7 +24,7 @@ stringNode* initalization(char* buffer, char* delimiters, int buffersize, int de
 void printLL(stringNode* head);
 
 int sequentialSort(void* toSort, int (*comparator)(void*, void*)){
-    int arrayLength = sizeof(toSort)/sizeof(toSort[0]);
+    int arrayLength = sizeof(toSort)/sizeof(toSort[0]); //This will not work since toSort will be a pointer to the start of the array so the size will be 8 instead of the size of the array (FIX LATER)
     for(int sortedPosition = 1; sortedPosition < arrayLength; ++sortedPosition){
         int unsortedElementPos = sortedPosition + 1;
         while(comparator(toSort[unsortedElementPos], toSort[unsortedElementPos - 1]) < 0 && unsortedElementPos > 0){
@@ -88,9 +88,10 @@ stringNode* initalization(char* buffer, char* delimiters, int buffersize, int de
     int bufferPos;
     stringNode* head = tokenCreator(defaultSize);
     stringNode* curNode = head;
-    do{
-        memset(buffer, '\0', bytesToRead * sizeof(char));
-        readingFile(filedescriptor, buffer, bytesToRead);
+
+    memset(buffer, '\0', bytesToRead * sizeof(char));
+    readingFile(filedescriptor, buffer, bytesToRead);
+    while(buffer[0] != '\0'){
         for(bufferPos = 0; bufferPos < (buffersize/sizeof(buffer[0])); ++bufferPos){
             int temp = 0;
             int isDelimiter = 0;
@@ -100,17 +101,22 @@ stringNode* initalization(char* buffer, char* delimiters, int buffersize, int de
                     break;
                 }
             }
+
             if(isDelimiter && curNode->name[0] != '\0'){
-                stringNode* newNode = tokenCreator(defaultSize);
-
-                curNode->next = newNode;
-                newNode->prev = curNode;
-
-                curNode = newNode;
                 position = 0;
                 defaultSize = 20;
+
+                stringNode* newNode = tokenCreator(defaultSize);
+
+                newNode->prev = curNode;
+                curNode->next = newNode;
+                
+                curNode = newNode;
+
+            }else if(isDelimiter){
+                continue;
             }else{
-                if(position >= defaultSize){
+                if(position >= defaultSize && isspace(buffer[bufferPos]) == 0){
                     defaultSize = defaultSize * 2;
 
                     char* expanded = (char*) malloc(sizeof(char) * defaultSize);
@@ -121,19 +127,32 @@ stringNode* initalization(char* buffer, char* delimiters, int buffersize, int de
                     free(curNode->name);
                     curNode->name = expanded;
                 }
-                curNode->name[position] = buffer[bufferPos];
-                position++; 
-                
+                if(isspace(buffer[bufferPos]) == 0){
+                    curNode->name[position] = buffer[bufferPos];
+                    position++; 
+                }
             }
         }
-    }while(buffer[0] != '\0');
+        memset(buffer, '\0', bytesToRead * sizeof(char));
+        readingFile(filedescriptor, buffer, bytesToRead);
+    }
+
+    if(strlen(curNode->name) == 0){
+        if(curNode->prev == NULL){
+            head = NULL;
+        }else{
+            curNode->prev->next = NULL;
+        }
+        free(curNode);
+    }
+
     return head;
 } /* To add: make the name of the stringnodes be infinite long. 
 Concept: Double the size of the char[] and memset the characters to the newly doubled array size (Inefficient?)
 
 To add: Smart parsing (if it is a number, be able to store it into the numberLL etc.) Currently only works for strings
-To add: removal of whitespace
-To add: ensure the name[] can be infinitely long
+To add: removal of whitespace 
+To add: ensure the name[] can be infinitely long (DONE)
 
  */
 
@@ -144,7 +163,7 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
-    if(strlen(argv[1]) != 2 || strcmp(argv[1], "-i") != 0 || strcmp(argv[1], "-q") != 0){
+    if(strlen(argv[1]) != 2 || argv[1][0] != '-' || (argv[1][1] != 'q' && argv[1][1] != 'i')){
         printf("Please input only -i or -q!\n");
         return 0;
     } //NOTE change strcmp once we create the function 
