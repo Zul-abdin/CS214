@@ -25,7 +25,7 @@ void printLL(stringNode* head);
 void freeSNode(stringNode* node);
 void printNLL(numberNode* head);
 numberNode* numberCreator();
-
+int strcomp(void* arg1, void* arg2);
 
 
 int sequentialSort(void* toSort, int (*comparator)(void*, void*)){
@@ -54,12 +54,18 @@ int intCompare(void* arg1, void* arg2){
     return ar1 - ar2;
 }
 
-int strCompare(void* arg1, void* arg2){
-    char* ar1 = (char*)arg1;
-    char* ar2 = (char*)arg2;
-    printf("%d", strcmp(ar1, ar2));
-//TODO Replace strcmp() with a self-made string comparing function
-    return strcmp(ar1, ar2);
+int strcomp(void* arg1, void* arg2){
+    char* s1 = (char*)arg1;
+    char* s2 = (char*)arg2;
+    while(*s1 != '\0' && *s2 != '\0'){ 
+        if(*s1 == *s2){
+            s1 = s1 + sizeof(char);
+            s2 = s2 + sizeof(char); //Move up one position in the array
+        }else{
+            return *s1 - *s2;
+        }
+    }
+    return *s1 - *s2;
 }
 
 void readingFile(int fd, char* buffer, int bytesToRead){
@@ -148,7 +154,7 @@ stringNode* initalization(char* buffer, char* delimiters, int buffersize, int de
         }else{
             curNode->prev->next = NULL;
         }
-        free(curNode);
+        freeSNode(curNode);
     }
 
     return head;
@@ -183,7 +189,7 @@ int main(int argc, char* argv[]) {
     char buffer[100] = {'\0'};
     int bytesToRead = sizeof(buffer);
     stringNode* head = initalization(buffer, delimiters, sizeof(buffer), sizeof(delimiters), filedescriptor, bytesToRead);
-    printf("The LL for the stringNode is:\n");
+    printf("The LL(Tokens) for the file is:\n");
 	printLL(head);
 	
 	
@@ -203,7 +209,7 @@ int main(int argc, char* argv[]) {
 			curNNode->next = temp;
 			temp->prev = curNNode;
 			curNNode = temp;
-            
+
 			stringNode* toFree = curNode;
 			curNode = curNode->next;
 			freeSNode(toFree);
