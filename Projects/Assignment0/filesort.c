@@ -150,14 +150,16 @@ int strcomp(void* arg1, void* arg2){
 void readingFile(int fd, char* buffer, int bytesToRead){
     int position = 0;
     int bytesRead = 0;
+    int status = 0;
     memset(buffer, '\0', bytesToRead);
     do{
-        int status = read(fd, &buffer[position], bytesToRead-bytesRead);
+        status = read(fd, &buffer[position], bytesToRead-bytesRead);
         if(status == 0){
             printf("File Reading finished or Buffer is full\n");
             break;
         }else if(status == -1){
             printf("Error in the file reading\n");
+            return;
         }
         bytesRead += status;
         position = bytesRead; //Position is used to see where to place it in buffer so no overwrites
