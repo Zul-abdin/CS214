@@ -283,8 +283,9 @@ numberNode* numberCreator(){
 int insertionSort(void* head, int (*comparator)(void*, void*)){
     stringNode* ptr = head;
     stringNode* temp = NULL;
-    stringNode* valueHolder = NULL;
 
+    /*
+    stringNode* valueHolder = NULL;
     if(comparator != &strcomp){
        // ptr = (numberNode*) ptr; Not sure if this does anything
        // temp = (numberNode*) temp; Not sure if this does anything
@@ -292,6 +293,8 @@ int insertionSort(void* head, int (*comparator)(void*, void*)){
     }else{
         valueHolder = (stringNode*) malloc(sizeof(stringNode) * 1);
     }
+    Not NEEDED?
+    */ 
     while(ptr != NULL){
         if(ptr->prev == NULL){ //First element is always sorted
             ptr = ptr->next;
@@ -299,9 +302,9 @@ int insertionSort(void* head, int (*comparator)(void*, void*)){
         }
         temp = ptr;
         while(ptr->prev != NULL && comparator(ptr->value, ptr->prev->value) < 0){
-            valueHolder->value = ptr->value;
+            char* holder = ptr->value;  //valueHolder->value = ptr->value;
             ptr->value = ptr->prev->value;
-            ptr->prev->value = valueHolder->value;
+            ptr->prev->value = holder;//valueHolder->value;
             ptr = ptr->prev;
         }
         ptr = temp;
