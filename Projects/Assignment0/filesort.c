@@ -253,6 +253,7 @@ stringNode* initalization(char* buffer, char* delimiters, int buffersize, int de
     
 } /* To fix: if the last input does not have a delimiter followed by it, should be removed or not (gonna ask franny)?  
     Looking for EDGECASES still
+    There's some weird bug on my end where it's copying the last 3 characters TO BE LOOKED AT LATER
  */
 void printNLL(numberNode* node){
     while(node != NULL){
