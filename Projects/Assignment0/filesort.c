@@ -60,7 +60,10 @@ int main(int argc, char* argv[]) {
     stringNode* head = initalization(buffer, delimiters, sizeof(buffer), sizeof(delimiters), filedescriptor, bytesToRead);
     printf("The LL(Tokens) for the file is:\n");
 	printLL(head);
-	
+	if(head == NULL){
+        printf("Sorted the empty file\n");
+        return 0;
+    }
 	printf("\n");
 	numberNode* nhead = NULL;
 
@@ -119,9 +122,11 @@ void printLL(stringNode* head){
 }
 
 int intCompare(void* arg1, void* arg2){
-    if(arg1 == arg2){
+    int x1 = (int)arg1;
+    int x2 = (int)arg2;
+    if(x1 == x2){
         return 0;
-    }else if(arg1 < arg2){
+    }else if(x1 < x2){
         return -1;
     }else{
         return 1;
@@ -145,6 +150,7 @@ int strcomp(void* arg1, void* arg2){
 void readingFile(int fd, char* buffer, int bytesToRead){
     int position = 0;
     int bytesRead = 0;
+    memset(buffer, '\0', bytesToRead);
     do{
         int status = read(fd, &buffer[position], bytesToRead-bytesRead);
         if(status == 0){
@@ -171,10 +177,11 @@ stringNode* initalization(char* buffer, char* delimiters, int buffersize, int de
     int defaultSize = 20;
     int position = 0;
     int bufferPos;
-    stringNode* head = tokenCreator(defaultSize);
+    int fileType = 0;
+    int negative = 0;
+    stringNode* head = tokenCreator((defaultSize + 1));
     stringNode* curNode = head;
 
-    memset(buffer, '\0', bytesToRead * sizeof(char));
     readingFile(filedescriptor, buffer, bytesToRead);
     while(buffer[0] != '\0'){
         for(bufferPos = 0; bufferPos < (buffersize/sizeof(buffer[0])); ++bufferPos){
@@ -188,39 +195,53 @@ stringNode* initalization(char* buffer, char* delimiters, int buffersize, int de
             }
 
             if(isDelimiter && curNode->value[0] != '\0'){
+                if(negative && fileType){
+                    char* negativeString = (char*) malloc(sizeof(char) * (strlen(curNode->value) + 2)); //+2 one for terminal and one for '-'
+                    memset(negativeString, '\0', (strlen(curNode->value) + 2) * sizeof(char));
+                    negativeString[0] = '-';
+                    memcpy(negativeString+1, curNode->value, strlen(curNode->value));
+
+                    free(curNode->value);
+                    curNode->value = negativeString;
+
+                }
                 position = 0;
                 defaultSize = 20;
 
-                stringNode* newNode = tokenCreator(defaultSize);
+                stringNode* newNode = tokenCreator((defaultSize+1));
 
                 newNode->prev = curNode;
                 curNode->next = newNode;
                 
                 curNode = newNode;
-
+                negative = 0;
             }else if(isDelimiter || isalnum(buffer[bufferPos]) == 0){
+                if(buffer[bufferPos] == '-' && position == 0){
+                    negative = 1;
+                }
                 continue;
             }else{
                 if(position >= defaultSize){
                     defaultSize = defaultSize * 2;
 
-                    char* expanded = (char*) malloc(sizeof(char) * defaultSize);
-                    memset(expanded, '\0', defaultSize * sizeof(char));
+                    char* expanded = (char*) malloc(sizeof(char) * (defaultSize + 1));
+                    memset(expanded, '\0', (defaultSize + 1)* sizeof(char));
 
-                    memcpy(expanded, curNode->value, defaultSize/2);
+                    memcpy(expanded, curNode->value, strlen(curNode->value));
 
                     free(curNode->value);
                     curNode->value = expanded;
                 }
                 curNode->value[position] = buffer[bufferPos];
                 position++; 
+                if(isdigit(curNode->value[0]) > 0){
+                    fileType = 1;
+                }
             }
         }
-        memset(buffer, '\0', bytesToRead * sizeof(char));
         readingFile(filedescriptor, buffer, bytesToRead);
     }
-
-    if(strlen(curNode->value) == 0){
+    if(strlen(curNode->value) == 0){ //TO BE REMOVED if string/number does not end with delimiter (currently this allows the last token to stay even though it shouldn't since there is no delimiter to indicate it's a token)
         if(curNode->prev == NULL){
             head = NULL;
         }else{
@@ -228,15 +249,10 @@ stringNode* initalization(char* buffer, char* delimiters, int buffersize, int de
         }
         freeSNode(curNode);
     }
-
     return head;
-} /* To add: make the value of the stringnodes be infinite long. 
-Concept: Double the size of the char[] and memset the characters to the newly doubled array size (Inefficient?)
-
-To add: Smart parsing (if it is a number, be able to store it into the numberLL etc.) Currently only works for strings
-To add: removal of whitespace 
-To add: ensure the value[] can be infinitely long (DONE)
-
+    
+} /* To fix: if the last input does not have a delimiter followed by it, should be removed or not (gonna ask franny)?  
+    Looking for EDGECASES still
  */
 void printNLL(numberNode* node){
     while(node != NULL){
@@ -269,8 +285,8 @@ int insertionSort(void* head, int (*comparator)(void*, void*)){
     stringNode* valueHolder = NULL;
 
     if(comparator != &strcomp){
-        ptr = (numberNode*) ptr;
-        temp = (numberNode*) temp;
+       // ptr = (numberNode*) ptr; Not sure if this does anything
+       // temp = (numberNode*) temp; Not sure if this does anything
         valueHolder = (numberNode*) malloc(sizeof(numberNode) * 1);
     }else{
         valueHolder = (stringNode*) malloc(sizeof(stringNode) * 1);
