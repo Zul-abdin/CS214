@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <ctype.h>
+#include <unistd.h>
 
 typedef struct _stringNode_{
     char* value;
@@ -27,9 +28,10 @@ void printNLL(numberNode* head);
 void freeSNode(stringNode* node);
 int strcomp(void* string1, void* string2);
 void insertionSort(void* head, int (*comparator)(void*, void*));
+void* partition(void* startNode, void* endNode, int (*comparator)(void*, void*));
+void quickSortRecursive(void* startNode, void* endNode, int (*comparator)(void*, void*));
+void quickSort( void* head, int (*comparator)(void*, void*));
 int intCompare(void* arg1, void* arg2);
-
-int numFile = 0;
 
 int main(int argc, char** argv){
 
@@ -63,6 +65,8 @@ int main(int argc, char** argv){
 	
 	printf("The LL(Tokens) for the file is:\n");
 	printLL(head);
+
+    int numFile = 0;
 	
 	numberNode* nhead = NULL;
 	if(isdigit(head->value[0]) > 0){
@@ -105,14 +109,27 @@ int main(int argc, char** argv){
 	
 
 	printf("The LL for the sorted is:\n");
-	if(numFile){
-		int (*strfp)(void*, void*) = intCompare;
-		insertionSort(nhead, (strfp));
-		printNLL(nhead);
-	}else{
-		int (*strfp)(void*, void*) = strcomp;
-		insertionSort(head, (strfp));
-		printLL(head);
+
+	if(argv[1][1] == 'i') {
+        if (numFile) {
+            int (*strfp)(void *, void *) = intCompare;
+            insertionSort(nhead, (strfp));
+            printNLL(nhead);
+        } else {
+            int (*strfp)(void *, void *) = strcomp;
+            insertionSort(head, (strfp));
+            printLL(head);
+        }
+    } else {
+        if (numFile) {
+            int (*strfp)(void *, void *) = intCompare;
+            quickSort(nhead, (strfp));
+            printNLL(nhead);
+        } else {
+            int (*strfp)(void *, void *) = strcomp;
+            quickSort(head, (strfp));
+            printLL(head);
+        }
 	}
 	
 	
@@ -125,7 +142,7 @@ int main(int argc, char** argv){
 }
 void printLL(stringNode* head){
 	while(head != NULL){
-		printf("Name: %s size of %d\n", head->value, strlen(head->value));
+		printf("Name: %s size of %lu\n", head->value, strlen(head->value));
 		head = head->next; 
 	}
 }
@@ -151,7 +168,7 @@ int intCompare(void* arg1, void* arg2){
 	numberNode* x1ptr = (numberNode*) arg1;
 	numberNode* x2ptr = (numberNode*) arg2;
 	int x1 = x1ptr->value;
-	int x2 = x2ptr->prev->value;
+	int x2 = x2ptr->value;
 	
 	if(x1 == x2){
 		return 0;
@@ -168,7 +185,7 @@ void insertionSort(void* head, int (*comparator)(void*, void*)){
 	stringNode* temp = NULL;
 	while(ptr != NULL){
 		temp = ptr;
-		while(ptr->prev != NULL && comparator(ptr, ptr) < 0 ){
+		while(ptr->prev != NULL && comparator(ptr, ptr->prev) < 0 ){
 			char* holder = ptr->value;
 			ptr->value = ptr->prev->value;
 			ptr->prev->value = holder;
@@ -179,12 +196,60 @@ void insertionSort(void* head, int (*comparator)(void*, void*)){
 	}
 }
 
+void* partition(void* startNode, void* endNode, int (*comparator)(void*, void*)){
+    stringNode* pivot = startNode;
+    stringNode* end = endNode;
+    stringNode* storeIndex = pivot->next;
+
+    stringNode* i;
+    for(i = pivot->next; i != end->next; i = i->next){
+        if(comparator(i, pivot) <= 0){
+            char* holder = i->value;
+            i->value = storeIndex->value;
+            storeIndex->value = holder;
+            storeIndex = storeIndex->next;
+        }
+    }
+    char* holder = pivot->value;
+    pivot->value = storeIndex->prev->value;
+    storeIndex->prev->value = holder;
+
+    return storeIndex->prev;
+}
+
+void quickSortRecursive(void* startNode, void* endNode, int (*comparator)(void*, void*)){
+    if(startNode == endNode || startNode == NULL || endNode == NULL){
+        return;
+    }
+
+    stringNode* i;
+    for(i = endNode; i != NULL; i = i->next){
+        if(i == startNode){
+            return;
+        }
+    }
+
+    stringNode* prevPivot = partition(startNode, endNode, comparator);
+    quickSortRecursive(startNode, prevPivot->prev, comparator);
+    quickSortRecursive(prevPivot->next, endNode, comparator);
+}
+
+void quickSort( void* head, int (*comparator)(void*, void*)){
+    stringNode* tail = head;
+
+    while(tail->next != NULL){
+        tail = tail->next;
+    }
+
+    quickSortRecursive(head, tail, comparator);
+}
+
 int strcomp(void* string1, void* string2){
 	stringNode* s1ptr = (stringNode*)string1;
 	stringNode* s2ptr = (stringNode*)string2;
 	
 	char* s1 = s1ptr->value;
-	char* s2 = s2ptr->prev->value;
+	char* s2 = s2ptr->value;
 	while(*s1 != '\0' && *s2 != '\0'){
 		if(*s1 == *s2){
 			s1 = s1 + sizeof(char);
