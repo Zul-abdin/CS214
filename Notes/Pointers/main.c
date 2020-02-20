@@ -151,7 +151,7 @@ int main(int argc, char* argv[]) {
     //Pointer to the function that returns an int and takes an int as a parameter
     //functionPointer is the name of the function pointer and the type takes into account parameters and return types
     //But you still have to set it to the right set of instructions, "= function"
-    int (*functionPointer)(int)= function;
+    int (*functionPointer)(int) = function;
 
     //Calling function using pointer
     printf("%d\n", functionPointer(4));
