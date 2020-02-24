@@ -56,6 +56,7 @@ int main(int argc, char* argv[]) {
      * - But we need persistent storage to store the location of dick blocks and files
      *   - Such metadata is stored in a special section of the HDD
      * - Data needed to access files stored in "i-nodes"
+     *   - Made up of metadata and pointers
      *   - Meta-data for the disk blocks
      *   - Info needed to access a file
      *     - List of disk blocks that make up the file
