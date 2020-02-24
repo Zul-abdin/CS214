@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <ctype.h>
+#include <unistd.h>
 
 typedef struct _stringNode_{
     char* value;
@@ -27,9 +28,11 @@ void printNLL(numberNode* head);
 void freeSNode(stringNode* node);
 int strcomp(void* string1, void* string2);
 void insertionSort(void* head, int (*comparator)(void*, void*));
+void* partition(void* startNode, void* endNode, int (*comparator)(void*, void*));
+void quickSortRecursive(void* startNode, void* endNode, int (*comparator)(void*, void*));
+void quickSort( void* head, int (*comparator)(void*, void*));
 int intCompare(void* arg1, void* arg2);
-
-int numFile = 0;
+void freeNNode(numberNode* node);
 
 int main(int argc, char** argv){
 
@@ -57,15 +60,17 @@ int main(int argc, char** argv){
 	stringNode* head = initalization(buffer, delimiters, sizeof(buffer), sizeof(delimiters), filedescriptor, bytesToRead);
 	
 	if(head == NULL){
-		printf("Sorted the empty file\n");
+		printf("Warning: Empty File\n");
 		return 0;
 	}
 	
 	printf("The LL(Tokens) for the file is:\n");
 	printLL(head);
-	
+
+   int numFile = 0;
+
 	numberNode* nhead = NULL;
-	if(isdigit(head->value[0]) > 0){
+	if(isdigit(head->value[0]) > 0 || (head->value[0] == '-' && isdigit(head->value[1]) > 0)){
 		numFile = 1;
 		stringNode* curNode = head;
 		numberNode* curNNode = numberCreator();
@@ -78,7 +83,7 @@ int main(int argc, char** argv){
 			if(valueHolder <= 2147483647 && valueHolder >= -2147483648){
 				curNNode->value = atoi(curNode->value);
 			}else{
-				printf("FATAL ERROR\n");
+				printf("FATAL ERROR: Integer Overflow\n");
 				//ADD DEALLOCATE NODES method here
 				return 0;
 			}
@@ -105,14 +110,54 @@ int main(int argc, char** argv){
 	
 
 	printf("The LL for the sorted is:\n");
-	if(numFile){
-		int (*strfp)(void*, void*) = intCompare;
-		insertionSort(nhead, (strfp));
-		printNLL(nhead);
-	}else{
-		int (*strfp)(void*, void*) = strcomp;
-		insertionSort(head, (strfp));
-		printLL(head);
+
+	if(argv[1][1] == 'i') {
+        if (numFile) {
+            int (*strfp)(void *, void *) = intCompare;
+            insertionSort(nhead, (strfp));
+            printNLL(nhead);
+            
+            numberNode* temp_ = nhead;
+            while(temp_ != NULL){
+            	numberNode* toFree = temp_;
+            	temp_ = temp_->next;
+            	freeNNode(toFree);
+            }
+        } else {
+            int (*strfp)(void *, void *) = strcomp;
+            insertionSort(head, (strfp));
+            printLL(head);
+            
+            stringNode* temp_ = head;
+				while(temp_ != NULL){
+            	stringNode* toFree = temp_;
+            	temp_ = temp_->next;
+            	freeSNode(toFree);
+            }
+        }
+    } else {
+        if (numFile) {
+            int (*strfp)(void *, void *) = intCompare;
+            quickSort(nhead, (strfp));
+            printNLL(nhead);
+            
+            numberNode* temp_ = nhead;
+            while(temp_ != NULL){
+            	numberNode* toFree = temp_;
+            	temp_ = temp_->next;
+            	freeNNode(toFree);
+            }
+        } else {
+            int (*strfp)(void *, void *) = strcomp;
+            quickSort(head, (strfp));
+            printLL(head);
+            stringNode* temp_ = head;
+            while(temp_ != NULL){
+            	stringNode* toFree = temp_;
+            	temp_ = temp_->next;
+            	freeSNode(toFree);
+            }
+        }
 	}
 	
 	
@@ -125,14 +170,14 @@ int main(int argc, char** argv){
 }
 void printLL(stringNode* head){
 	while(head != NULL){
-		printf("Name: %s size of %d\n", head->value, strlen(head->value));
+		printf("%s\n", head->value);
 		head = head->next; 
 	}
 }
 
 void printNLL(numberNode* head){
 	while(head != NULL){
-		printf("Value: %d\n", head->value);
+		printf("%d\n", head->value);
 		head = head->next;	
 	}
 }
@@ -145,13 +190,24 @@ void freeSNode(stringNode* node){
 	if(node->next != NULL){
 		node->next->prev = node->prev;
 	}
+	free(node);
+}
+
+void freeNNode(numberNode* node){
+	if(node->prev != NULL){
+		node->prev->next = node->next;
+	}
+	if(node->next != NULL){
+		node->next->prev = node->prev;
+	}
+	free(node);
 }
 
 int intCompare(void* arg1, void* arg2){
 	numberNode* x1ptr = (numberNode*) arg1;
 	numberNode* x2ptr = (numberNode*) arg2;
 	int x1 = x1ptr->value;
-	int x2 = x2ptr->prev->value;
+	int x2 = x2ptr->value;
 	
 	if(x1 == x2){
 		return 0;
@@ -168,7 +224,7 @@ void insertionSort(void* head, int (*comparator)(void*, void*)){
 	stringNode* temp = NULL;
 	while(ptr != NULL){
 		temp = ptr;
-		while(ptr->prev != NULL && comparator(ptr, ptr) < 0 ){
+		while(ptr->prev != NULL && comparator(ptr, ptr->prev) < 0 ){
 			char* holder = ptr->value;
 			ptr->value = ptr->prev->value;
 			ptr->prev->value = holder;
@@ -179,12 +235,69 @@ void insertionSort(void* head, int (*comparator)(void*, void*)){
 	}
 }
 
+void* partition(void* startNode, void* endNode, int (*comparator)(void*, void*)){
+	stringNode* pivot = (stringNode*)startNode;
+	
+	stringNode* left = pivot->next;
+   stringNode* end = endNode;
+   stringNode* storeIndex = left;
+	stringNode* beforeNULL = end;
+
+
+    stringNode* i;
+    for(i = left; i != end->next; i = i->next){
+       if(comparator(i, pivot) <= 0){
+       	  beforeNULL = storeIndex;
+           char* holder = i->value;
+           i->value = storeIndex->value;
+           storeIndex->value = holder;
+           storeIndex = storeIndex->next;
+       }
+    }
+    char* holder = pivot->value;
+    if(storeIndex == NULL){
+    	pivot->value = beforeNULL->value;
+    	beforeNULL->value = holder;
+    	return beforeNULL;
+    }else{
+    	pivot->value = storeIndex->prev->value;
+    	storeIndex->prev->value = holder;
+    	return storeIndex->prev;
+	 }
+    return NULL; //ERROR IF IT REACHES HERE
+}
+
+void quickSortRecursive(void* startNode, void* endNode, int (*comparator)(void*, void*)){
+    if(startNode == endNode || startNode == NULL || endNode == NULL){
+        return;
+    }
+
+    stringNode* i;
+    for(i = endNode; i != NULL; i = i->next){
+        if(i == startNode){
+            return;
+        }
+    }
+
+    stringNode* prevPivot = partition(startNode, endNode, comparator);
+    quickSortRecursive(startNode, prevPivot->prev, comparator);
+    quickSortRecursive(prevPivot->next, endNode, comparator);
+}
+
+void quickSort( void* head, int (*comparator)(void*, void*)){
+    stringNode* tail = head;
+    while(tail->next != NULL){
+        tail = tail->next;
+    }
+    quickSortRecursive(head, tail, comparator);
+}
+
 int strcomp(void* string1, void* string2){
 	stringNode* s1ptr = (stringNode*)string1;
 	stringNode* s2ptr = (stringNode*)string2;
 	
 	char* s1 = s1ptr->value;
-	char* s2 = s2ptr->prev->value;
+	char* s2 = s2ptr->value;
 	while(*s1 != '\0' && *s2 != '\0'){
 		if(*s1 == *s2){
 			s1 = s1 + sizeof(char);
@@ -204,10 +317,10 @@ void readingFile(int fd, char* buffer, int bytesToRead){
     do{
         status = read(fd, (buffer + bytesRead), bytesToRead-bytesRead);
         if(status == 0){
-            printf("Finished reading the File or Buffer is filled\n");
+            //printf("Finished reading the File or Buffer is filled\n");
             break;
         }else if(status == -1){
-            printf("Error in the file reading\n");
+            printf("Warning: Error when reading the file reading\n");
             return;
         }
         bytesRead += status;
@@ -216,6 +329,10 @@ void readingFile(int fd, char* buffer, int bytesToRead){
 
 stringNode* tokenCreator(int size){
     stringNode* newNode = (stringNode*) malloc(sizeof(stringNode) * 1);
+    if(newNode == NULL){
+    	printf("Warning: Malloc Failed\n");
+    	return NULL;
+    }
     newNode->value = (char*) malloc(sizeof(char) * size);
     memset(newNode->value, '\0', sizeof(char) * size);
     newNode->next = NULL;
@@ -226,6 +343,10 @@ stringNode* tokenCreator(int size){
 
 numberNode* numberCreator(){
 	numberNode* newNode = (numberNode*) malloc(sizeof(numberNode) * 1);
+	if(newNode == NULL){
+		printf("Warning: Malloc Failed\n");
+		return NULL;
+	}
 	newNode->value = 0;
 	newNode->next = NULL;
 	newNode->prev = NULL;
@@ -253,7 +374,7 @@ stringNode* initalization(char* buffer, char* delimiters, int bufferSize, int de
 		       }
 		    }
 
-		    if(isDelimiter && curNode->value[0] != '\0'){
+		    if(isDelimiter){ // && curNode->value[0] != '\0'
 		     	if(negative && fileType){
 		     		char* negativeString =  (char*) malloc(sizeof(char) * (strlen(curNode->value) + 2)); // +2 one for terminal character and one for '-'
 				  	memset(negativeString, '\0', (strlen(curNode->value) + 2) * sizeof(char));
@@ -275,7 +396,7 @@ stringNode* initalization(char* buffer, char* delimiters, int bufferSize, int de
 		         
 		      curNode = newNode;
 		         
-		    }else if(isDelimiter || (isalnum(buffer[bufferPos]) == 0)){
+		    }else if(isalnum(buffer[bufferPos]) == 0){ // isDelimiter &&
 		     	if(buffer[bufferPos] == '-' && position == 0){
 		     		negative = 1;
 		     	}
@@ -301,7 +422,7 @@ stringNode* initalization(char* buffer, char* delimiters, int bufferSize, int de
      	 readingFile(filedescriptor, buffer, bytesToRead);
 	 }
 	 
-	 if(strlen(curNode->value) == 0){ //TO BE REMOVED IF EOF is not a valid delimiter (awaiting Franny answer)
+	 if(strlen(curNode->value) == 0){ 
 	 	if(curNode->prev == NULL){
 	 		head = NULL;
 	 	}else{
@@ -312,19 +433,3 @@ stringNode* initalization(char* buffer, char* delimiters, int bufferSize, int de
 	 
     return head;
 } 
-
-/*
-    NEGATIVE NUMBERS ARE POSSIBLE
-    ADD ERRORCASE for 2^(32) sized-integers
-    IS "token valid" if it does not have ',' but EOF
-    
-    Is: 
-    22333-45, valid and does it become 22333245?
-    --5, valid?
-    abc-d, becomes abcd
-    
-    Are we allowed to use atoi(), isDigit(), isalphanum(), 
-    Pass in pointers and deference the pointers in the comparator function itself.
-    ,,,,,,,,,,,,,,,, Should there be tokens for that? just be '' as the value?
-    what about ,,,,,,,, for numbers
-*/
