@@ -78,7 +78,7 @@ int main(int argc, char* argv[]) {
      *
      * Interruptions
      * - Exception
-     *   - Specify a region where the exception can occur
+     *   - Specify a region where the exception can occur (try block)
      *   - Can catch: Specify code to run on exception
      *   - On exception, jump to second code block and continue
      * - Signals: Software interrupt to deal with something important
@@ -90,7 +90,7 @@ int main(int argc, char* argv[]) {
      *       - If you have a signal handler creates a new stack frame at top of stack for it, if it decides to run it
      *       - Else, runs the default code from OS
      *     - After the signal handler returns, the OS will restore previous context and begin to run  exactly where you left off
-     *   - signal(int signum, void(*func)(int) FunctionPointer)
+     *   - signal(int signum, void(*func)(int) FunctionPointer) in signal.h
      *     - Returns a signal handler that will run the code given when the signal, signum, occurs
      *   - How to send a signal to any PID:
      *     - ps aux | grep bin/main (Finds every line with bin/main)
@@ -99,8 +99,38 @@ int main(int argc, char* argv[]) {
      *   - Exceptions will skip over all the code in the try-catch
      *   - Signals will always resume at the point where the signal occurs
      *
-     * - Threads: A new context of execution running in the same process
-     *   - A new stack allocated in the heap to hold the new context
+     * Threads: A new context of execution running in the same process
+     * - A new stack allocated in the heap to hold the new context
+     * - pthread.h library
+     *   - pthread_create(pthread_t* thread, const pthread_attr_t* attr, void* (*start)(void*), void* arg)
+     *     - pthread_t* thread: Handle for the currently-created thread. It represents the thread.
+     *     - const pthread_attr_t* attr: struct of pthread options (Can usually use the default one)
+     *     - void* (*start)(void*): function to run as a thread
+     *     - void* arg thread function's parameters (If you have multiple arguments to pass, use a struct ON THE HEAP)
+     * - Pros of Threads
+     *   - It is an independent stack in your current process
+     *   - It is faster than creating processes
+     *   - It is faster than switching processes
+     *   - It is easier to pass data between threads because it shares the same heap
+     * - Pros of Processes
+     *   - If you want to load a new executable, you must use a process, threads cannot load new code
+     *   - A separate way to handle signals/IO
+     *     - If you want to handle signals/IO in 2 different ways you need 2 different processes
+     *   - A separate address space (So other code cannot handle your data)
+     *
+     * Exiting Code
+     * - return
+     *   - Throws away the current stack frame
+     *   - Posts exit signal
+     * - exit()
+     *   - Throws away the entire current stack. If that is the only stack, it will stop the process
+     *   - Posts exit signal
+     * - _exit()
+     *   - Stops the current process as fast as possible
+     *   - Does not post the exit signal
+     * - atexit(void (*func)(void))
+     *   - runs code after the exit signal has been posted
+     *   - good for post-run cleanup like de-allocating heap and memory
      */
 
     /*
