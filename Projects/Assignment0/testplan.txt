@@ -10,8 +10,8 @@ To test our code, we started with the basics:
 	A file containing numbers with no comma at the end to test if our fileReading and token processing will recognize EOF as a delimiter and consider the last number as a token. 
 	A file containing strings and empty tokens to test if our fileReading and token processing will work for a combination of empty tokens and strings in a file.
 	A file containing numbers and empty tokens to test if our fileReading and token processing will work for a combination of empty tokens and numbers in a file.
-	A file containing a mixture of whitespace and strings to test if our fileReading and token processing will eliminate the whitespace and keep the empty and strings in a file.
-	A file containing a mixture of whitespace and numbers to test if our fileReading and token processing will eliminate the whitespace and keep the empty and numbers in a file.
+	A file containing a mixture of whitespace and strings to test if our fileReading and token processing will eliminate the whitespace and keep the empty tokens and strings without whitespace in a file.
+	A file containing a mixture of whitespace and numbers to test if our fileReading and token processing will eliminate the whitespace and keep the empty tokens and numbers without whitspace in a file.
 	A file containing a token that is greater than our buffer size to test if our fileReading and token processing will work for a token that is longer than the buffer size.
 	A file containing an string to test our insertion sort and quicksort for one element. 
 	A file containing an number to test our insertion sort and quicksort for one element. 
