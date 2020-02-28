@@ -36,23 +36,23 @@ void freeNNode(numberNode* node);
 void freeNLL(numberNode* head);
 void freeSLL(stringNode* head);
 
-
+int numFile = 0;
 
 int main(int argc, char** argv){
 
 	if(argc != 3){
-		printf("Requires exactly 3 arguments. (Executable, sorting, fileToSort)\n");
+		printf("Fatal: Error: Requires exactly 3 arguments. (Executable, sorting, fileToSort)\n");
 		return 0;
 	}
 	
 	if(strlen(argv[1]) != 2 || argv[1][0] != '-' || (argv[1][1] != 'q' && argv[1][1] != 'i')){
-		printf("Please Input -i or -q only.\n");
+		printf("Fatal Error: Please Input -i or -q only.\n");
 		return 0;
 	}
 	
 	int filedescriptor = open(argv[2], O_RDONLY);
 	if(filedescriptor == -1){
-		printf("Error, File does note exist. Please try again!\n");
+		printf("Fatal Error: File does note exist. Please try again!\n");
 		return 0;
 	}
 
@@ -70,14 +70,21 @@ int main(int argc, char** argv){
 	/*printf("The LL(Tokens) for the file is:\n");
 	printLL(head);
 	*/
-	
-   int numFile = 0;
+	stringNode* _checkAllNull = head;
+	while(_checkAllNull != NULL && strlen(_checkAllNull->value) == 0 ){
+		_checkAllNull = _checkAllNull->next;
+	}
+	if(_checkAllNull == NULL){
+		printf("Warning: file contains only empty tokens, treating it as strings.\n");
+	}
 	numberNode* nhead = NULL;
-	if(isdigit(head->value[0]) > 0 || (head->value[0] == '-' && isdigit(head->value[1]) > 0)){
-		numFile = 1;
+	if(numFile){
 		stringNode* curNode = head;
 		numberNode* curNNode = numberCreator();
-		
+		if(curNNode == NULL){
+			freeSLL(head);
+			return 0;
+		}
 		head = NULL;
 		nhead = curNNode;
 		
@@ -88,14 +95,17 @@ int main(int argc, char** argv){
 			}else{
 				printf("FATAL ERROR: Integer Overflow\n");
 				freeNLL(nhead);
+				freeSLL(curNode);
 				return 0;
 			}
 			
 			if(curNode->next != NULL){
 				numberNode* temp = numberCreator();
-				while(temp == NULL){
-					printf("Warning: Malloc failed\n");
-					temp = numberCreator();
+				if(temp == NULL){
+					freeNLL(nhead);
+					freeSLL(curNode);
+					close(filedescriptor);
+					return 0;
 				}
 				curNNode->next = temp;
 				temp->prev = curNNode;
@@ -144,7 +154,7 @@ int main(int argc, char** argv){
 	}
 	
 	if(close(filedescriptor) < 0){
-		printf("Warning: File Descriptor would not close\n");
+		printf("Error: File Descriptor would not close\n");
 	}
 	
 	return 0;
@@ -319,7 +329,7 @@ void readingFile(int fd, char* buffer, int bytesToRead){
             //printf("Finished reading the File or Buffer is filled\n");
             break;
         }else if(status == -1){
-            printf("Warning: error detected when file reading\n");
+            printf("Error: error detected when file reading\n");
             return;
         }
         bytesRead += status;
@@ -327,15 +337,27 @@ void readingFile(int fd, char* buffer, int bytesToRead){
 }
 
 stringNode* tokenCreator(int size){
+	 int temp = 0;
     stringNode* newNode = (stringNode*) malloc(sizeof(stringNode) * 1);
-    while(newNode == NULL){
-    	printf("Warning: Malloc Failed\n");
+    while(newNode == NULL && temp != 3){
+    	printf("Error: Malloc Failed, retrying\n");
     	newNode = (stringNode*) malloc(sizeof(stringNode) * 1);
+    	temp++;
+    }
+    if(temp == 3){
+    printf("Fatal Error, ending program\n");
+    	return NULL;
     }
     newNode->value = (char*) malloc(sizeof(char) * size);
-    while(newNode->value == NULL){
-    	printf("Warning: Malloc Failed\n");
+    temp = 0;
+    while(newNode->value == NULL && temp != 3){
+    	printf("Error: Malloc Failed, retrying\n");
     	newNode->value = (char*) malloc(sizeof(char) * size);
+    	temp++;
+    }
+    if(temp == 3){
+    	printf("Fatal Error, ending program\n");
+    	return NULL;
     }
     memset(newNode->value, '\0', sizeof(char) * size);
     newNode->next = NULL;
@@ -346,10 +368,16 @@ stringNode* tokenCreator(int size){
 
 numberNode* numberCreator(){
 	numberNode* newNode = (numberNode*) malloc(sizeof(numberNode) * 1);
-	while(newNode == NULL){
-		printf("Warning: Malloc Failed\n");
+	int temp = 0;
+	while(newNode == NULL && temp != 3){
+		printf("Error: Malloc Failed, retrying\n");
 		newNode = (numberNode*) malloc(sizeof(numberNode) * 1);
+		temp++;
 	}
+	if(temp == 3){
+    	printf("Fatal Error, ending program\n");
+    	return NULL;
+    }
 	newNode->value = 0;
 	newNode->next = NULL;
 	newNode->prev = NULL;
@@ -363,6 +391,10 @@ stringNode* initalization(char* buffer, char* delimiters, int bufferSize, int de
      int negative = 0;
      int fileType = 0;
      stringNode* head = tokenCreator(defaultSize+1);
+     if(head == NULL){
+     	 close(filedescriptor);
+     	 exit(0);
+     }
      stringNode* curNode = head;
      
      readingFile(filedescriptor, buffer, bytesToRead);
@@ -380,9 +412,11 @@ stringNode* initalization(char* buffer, char* delimiters, int bufferSize, int de
 		    if(isDelimiter){ // && curNode->value[0] != '\0'
 		     	if(negative && fileType){
 		     		char* negativeString =  (char*) malloc(sizeof(char) * (strlen(curNode->value) + 2)); // +2 one for terminal character and one for '-'
-		     		while(negativeString == NULL){
-		     			printf("Warning: Malloc failed\n");
-		     			negativeString = (char*) malloc(sizeof(char) * (strlen(curNode->value) + 2));
+		     	   if(negativeString == NULL){
+		     			printf("Fatal Error: Malloc failed\n");
+		     			freeSLL(head);
+		     			close(filedescriptor);
+		     			exit(0);
 		     		}
 				  	memset(negativeString, '\0', (strlen(curNode->value) + 2) * sizeof(char));
 				 	negativeString[0] = '-';
@@ -397,7 +431,11 @@ stringNode* initalization(char* buffer, char* delimiters, int bufferSize, int de
 		     	negative = 0;
 		     		
 		      stringNode* newNode = tokenCreator(defaultSize+1);
-		         
+		      if(newNode == NULL){
+		      	freeSLL(head);
+		      	close(filedescriptor);
+		      	exit(0);
+		      }
 		      newNode->prev = curNode;
 		      curNode->next = newNode;
 		         
@@ -412,9 +450,11 @@ stringNode* initalization(char* buffer, char* delimiters, int bufferSize, int de
 				  	defaultSize = defaultSize * 2;
 				  	  	
 				  	char* expanded =  (char*) malloc(sizeof(char) * (defaultSize + 1));
-				  	while(expanded == NULL){
-				  		printf("Warning: Malloc failed\n");
-				  		expanded = (char*) malloc(sizeof(char) * (defaultSize + 1));
+				  	if(expanded == NULL){
+				  		printf("Fatal Error: Malloc failed\n");
+				  		close(filedescriptor);
+				  		freeSLL(head);
+				  		exit(0);
 				  	}
 				  	memset(expanded, '\0', (defaultSize+1) * sizeof(char));
 				  	memcpy(expanded, curNode->value, strlen(curNode->value));
@@ -425,13 +465,29 @@ stringNode* initalization(char* buffer, char* delimiters, int bufferSize, int de
 		      curNode->value[position] = buffer[bufferPos];
 		      position++; 
 		      if(isdigit(curNode->value[0]) > 0){
-		  	  		fileType = 1;	
+		  	  		fileType = 1;
+		  	  		numFile = 1;	
 		  	  	}
 		    }
 		     //END OF BUFFER LOOP
 		 }
      	 readingFile(filedescriptor, buffer, bytesToRead);
 	 }
+	 if(negative && fileType){
+		     		char* negativeString =  (char*) malloc(sizeof(char) * (strlen(curNode->value) + 2)); // +2 one for terminal character and one for '-'
+		     	   if(negativeString == NULL){
+		     			printf("Fatal Error: Malloc failed\n");
+		     			freeSLL(head);
+		     			close(filedescriptor);
+		     			exit(0);
+		     		}
+				  	memset(negativeString, '\0', (strlen(curNode->value) + 2) * sizeof(char));
+				 	negativeString[0] = '-';
+				  	memcpy(negativeString+1, curNode->value, strlen(curNode->value));
+				    	
+				  	free(curNode->value);
+				  	curNode->value = negativeString;
+	}
 	 
 	 if(strlen(curNode->value) == 0){ 
 	 	if(curNode->prev == NULL){
