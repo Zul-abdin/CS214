@@ -413,8 +413,14 @@ stringNode* initalization(char* buffer, char* delimiters, int bufferSize, int de
 
 		    if(isDelimiter){ // && curNode->value[0] != '\0'
 		     	if(negative && fileType){
-		     		char* negativeString =  (char*) malloc(sizeof(char) * (strlen(curNode->value) + 2)); // +2 one for terminal character and one for '-'
-		     	   if(negativeString == NULL){
+                    int temp1 = 0;
+                    char* negativeString =  (char*) malloc(sizeof(char) * (strlen(curNode->value) + 2)); // +2 one for terminal character and one for '-'
+                    while(negativeString == NULL && temp1 != 3){
+                        printf("Error: Malloc Failed, retrying\n");
+                        negativeString = (char*) malloc(sizeof(char) * (strlen(curNode->value) + 2));
+                        temp1++;
+                    }
+		     	   if(temp1 == 3){
 		     			printf("Fatal Error: Malloc failed\n");
 		     			freeSLL(head);
 		     			close(filedescriptor);
@@ -450,9 +456,14 @@ stringNode* initalization(char* buffer, char* delimiters, int bufferSize, int de
 		    }else{
 		     	if(position >= defaultSize){
 				  	defaultSize = defaultSize * 2;
-				  	  	
-				  	char* expanded =  (char*) malloc(sizeof(char) * (defaultSize + 1));
-				  	if(expanded == NULL){
+                    int temp1 = 0;
+                    char* expanded =  (char*) malloc(sizeof(char) * (defaultSize + 1));
+                    while(expanded == NULL && temp1 != 3){
+                        printf("Error: Malloc Failed, retrying\n");
+                        expanded = (char*) malloc(sizeof(char) * (defaultSize + 1));
+                        temp1++;
+                    }
+				  	if(temp1 == 3){
 				  		printf("Fatal Error: Malloc failed\n");
 				  		close(filedescriptor);
 				  		freeSLL(head);
@@ -476,19 +487,26 @@ stringNode* initalization(char* buffer, char* delimiters, int bufferSize, int de
      	 readingFile(filedescriptor, buffer, bytesToRead);
 	 }
 	 if(negative && fileType){
-		     		char* negativeString =  (char*) malloc(sizeof(char) * (strlen(curNode->value) + 2)); // +2 one for terminal character and one for '-'
-		     	   if(negativeString == NULL){
-		     			printf("Fatal Error: Malloc failed\n");
-		     			freeSLL(head);
-		     			close(filedescriptor);
-		     			exit(0);
-		     		}
-				  	memset(negativeString, '\0', (strlen(curNode->value) + 2) * sizeof(char));
-				 	negativeString[0] = '-';
-				  	memcpy(negativeString+1, curNode->value, strlen(curNode->value));
+
+         int temp1 = 0;
+         char* negativeString =  (char*) malloc(sizeof(char) * (strlen(curNode->value) + 2)); // +2 one for terminal character and one for '-'
+         while(negativeString == NULL && temp1 != 3){
+             printf("Error: Malloc Failed, retrying\n");
+             negativeString = (char*) malloc(sizeof(char) * (strlen(curNode->value) + 2));
+             temp1++;
+         }
+	     if(temp1 == 3){
+	         printf("Fatal Error: Malloc failed\n");
+	         freeSLL(head);
+	         close(filedescriptor);
+	         exit(0);
+	     }
+	     memset(negativeString, '\0', (strlen(curNode->value) + 2) * sizeof(char));
+	     negativeString[0] = '-';
+	     memcpy(negativeString+1, curNode->value, strlen(curNode->value));
 				    	
-				  	free(curNode->value);
-				  	curNode->value = negativeString;
+	     free(curNode->value);
+	     curNode->value = negativeString;
 	}
 	 
 	 if(strlen(curNode->value) == 0){ 
