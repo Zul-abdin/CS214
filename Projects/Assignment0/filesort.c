@@ -27,10 +27,10 @@ numberNode* numberCreator();
 void printNLL(numberNode* head);
 void freeSNode(stringNode* node);
 int strcomp(void* string1, void* string2);
-void insertionSort(void* head, int (*comparator)(void*, void*));
+int insertionSort(void* head, int (*comparator)(void*, void*));
 void* partition(void* startNode, void* endNode, int (*comparator)(void*, void*));
 void quickSortRecursive(void* startNode, void* endNode, int (*comparator)(void*, void*));
-void quickSort( void* head, int (*comparator)(void*, void*));
+int quickSort( void* head, int (*comparator)(void*, void*));
 int intCompare(void* arg1, void* arg2);
 void freeNNode(numberNode* node);
 void freeNLL(numberNode* head);
@@ -227,7 +227,7 @@ int intCompare(void* arg1, void* arg2){
 	}
 }
 
-void insertionSort(void* head, int (*comparator)(void*, void*)){
+int insertionSort(void* head, int (*comparator)(void*, void*)){
 
 	stringNode* ptr = head;
 	stringNode* temp = NULL;
@@ -242,6 +242,7 @@ void insertionSort(void* head, int (*comparator)(void*, void*)){
 		ptr = temp;
 		ptr = ptr->next;
 	}
+	return 1;
 }
 
 void* partition(void* startNode, void* endNode, int (*comparator)(void*, void*)){
@@ -293,12 +294,13 @@ void quickSortRecursive(void* startNode, void* endNode, int (*comparator)(void*,
     quickSortRecursive(prevPivot->next, endNode, comparator);
 }
 
-void quickSort( void* head, int (*comparator)(void*, void*)){
+int quickSort( void* head, int (*comparator)(void*, void*)){
     stringNode* tail = head;
     while(tail->next != NULL){
         tail = tail->next;
     }
     quickSortRecursive(head, tail, comparator);
+	return 1;
 }
 
 int strcomp(void* string1, void* string2){
