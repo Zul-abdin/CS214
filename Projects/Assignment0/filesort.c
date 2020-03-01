@@ -282,16 +282,14 @@ void quickSortRecursive(void* startNode, void* endNode, int (*comparator)(void*,
         return;
     }
 
-    stringNode* i;
-    for(i = endNode; i != NULL; i = i->next){
-        if(i == startNode){
-            return;
-        }
-    }
-
     stringNode* prevPivot = partition(startNode, endNode, comparator);
-    quickSortRecursive(startNode, prevPivot->prev, comparator);
-    quickSortRecursive(prevPivot->next, endNode, comparator);
+	if(prevPivot != startNode){
+		quickSortRecursive(startNode, prevPivot->prev, comparator);
+	}
+    if(prevPivot != endNode){
+		quickSortRecursive(prevPivot->next, endNode, comparator);
+	}
+   
 }
 
 int quickSort( void* head, int (*comparator)(void*, void*)){
