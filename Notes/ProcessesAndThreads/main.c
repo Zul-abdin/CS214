@@ -46,6 +46,12 @@ int main(int argc, char* argv[]) {
      *   - When child processes also call fork, creating an exponential increase of processes
      *   - Prevent them with: ulimit -u, to set a max number of processes
      *
+     *         int pid = fork();
+     *         if(pid == 0){
+     *             execvp("./SomeExecutable", (char *const *) "argv[]");
+     *         }
+     *         wait(&pid);
+     *
      * Completing a Child Process
      * - wait(NULL)
      *   - Returns when the first child process has finished running
@@ -88,16 +94,42 @@ int main(int argc, char* argv[]) {
      *     - If you want to handle signals/IO in 2 different ways you need 2 different processes
      *   - A separate address space (So other code cannot handle your data)
      *
-     */
-
-    /*
-     * int pid = fork();
+     * Scenario: Multi-threaded application representing a bank.
+     * - We cannot simply mutli-thread it normally, because consistency will become an issue when these sets of instructions occur:
+     *   -...
+     * - Issue created because there are 3 operations to replace and a signal can occur between any 2 operations
+     * - Possible Fixes?
+     *   - Give the user control of scheduling: Dangerous
+     *   - Give the user ability to be un-interruptable: Just as Dangerous
+     *   - Use signals between the threads: Slow and somewhat difficult to resolve
+     *   - Indicator variable: Also shared data, so the same issue can occur
      *
-     * if(pid == 0){
-     *     execvp("./SomeExecutable", (char *const *) "argv[]");
-     * }
-     *
-     * wait(&pid);
+     * - MUTEX (Best Fix)
+     *   - Make indicator change a single instruction
+     *     - So that it can't be interrupted (45) and is runnable instantly to indicate an event (45)
+     *     - Make it a blocking call
+     *   - We want to enforce MUTual EXclusion (MUTEX)
+     *     - pthread_mutex_lock
+     *     - pthread_mutex_unlock
+     *   - Synchronization
+     *     - critical section: segment of code that modifies/uses shared data
+     *     - race condition: result of non-deterministic code that uses shared data
+     *     - deadlock: synchronization mistake
+     *   - ACID
+     *     - A tomic
+     *     - C onsistent
+     *     - I solated
+     *     - D urable
+     *   - General Usage for MUTEX
+     *     - Mutex must have full process scope because multiple threads will be using the same mutex
+     *     - Wrap lock/unlock calls around critical sections
+     *     - Keep critical sections as small as possible
+     *     - Use only one mutex per shared data value
+     *     - Naming Convention: mutex_<varname>_<counter>
+     *   - Example:
+     *       pthread_mutex_lock(someMutex);
+     *       sharedData += 1;
+     *       pthread_mutex_init();
      */
 
     return 0;
