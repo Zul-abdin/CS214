@@ -1,1 +1,47 @@
-Testing Information Here
+To test our code, we started with the basics:
+	Empty file to test if our program will output a warning if given an empty file. 
+	A file containing less than our buffer size (100) to see if our fileReading method will be able to process less than buffer size or 100 bytes.
+	A file containing exactly the size of our buffer size to see if our fileReading method can process exactly the buffer size.
+	A file containing over our buffer size to see if our fileReading method can process more than our buffer size. 
+	A file containing only strings seperated by commas to see if our fileReading and token processing works for normal strings formatted files.
+	A file containing only numbers seperated by commas to see if our fileReading and token processing works for normal number formatted files.
+	A file containing only empty tokens to see if our fileReading and token processing will work for empty tokens and does not include the last empty token and prints out the warning stating it will treat it like strings.
+	A file containing strings with no comma at the end to test if our fileReading and token processing will recognize EOF as a delimiter and considers the last string as a token.
+	A file containing numbers with no comma at the end to test if our fileReading and token processing will recognize EOF as a delimiter and consider the last number as a token. 
+	A file containing strings and empty tokens to test if our fileReading and token processing will work for a combination of empty tokens and strings in a file.
+	A file containing numbers and empty tokens to test if our fileReading and token processing will work for a combination of empty tokens and numbers in a file.
+	A file containing a mixture of whitespace and strings to test if our fileReading and token processing will eliminate the whitespace and keep the empty tokens and strings without whitespace in a file.
+	A file containing a mixture of whitespace and numbers to test if our fileReading and token processing will eliminate the whitespace and keep the empty tokens and numbers without whitspace in a file.
+	A file containing a token that is greater than our buffer size to test if our fileReading and token processing will work for a token that is longer than the buffer size.
+	A file containing an string to test our insertion sort and quicksort for one element. 
+	A file containing an number to test our insertion sort and quicksort for one element. 
+	A file containing an ascending order of 10 strings to test our insertion sort and quicksort.
+	A file containing an ascending order of 100 strings to test our insertion sort and quicksort.
+	A file containing an ascending order of 1000 strings to test our insertion sort and quicksort.
+	A file containing an ascending order of 10 positive numbers to test our insertion sort and quicksort.
+	A file containing an ascending order of 100 positive numbers to test our insertion sort and quicksort.
+	A file containing an ascending order of 1000 positive numbers to test our insertion sort and quicksort.
+	A file containing an ascending order of 10 negative numbers to test our insertion sort and quicksort.
+	A file containing an ascending order of 100 negative numbers to test our insertion sort and quicksort.
+	A file containing an ascending order of 1000 negative numbers to test our insertion sort and quicksort.
+	A file containing an ascending order of 10 negative and positive numbers to test our insertion sort and quicksort.
+	A file containing an ascending order of 100 negative and positive numbers to test our insertion sort and quicksort.
+	A file containing an ascending order of 1000 negative and positive numbers to test our insertion sort and quicksort.
+	A file containing an descending order of 10 strings to test our insertion sort and quicksort.
+	A file containing an descending order of 100 strings to test our insertion sort and quicksort.
+	A file containing an descending order of 1000 strings to test our insertion sort and quicksort.
+	A file containing an descending order of 10 positive numbers to test our insertion sort and quicksort.
+	A file containing an descending order of 100 positive numbers to test our insertion sort and quicksort.
+	A file containing an descending order of 1000 positive numbers to test our insertion sort and quicksort.
+	A file containing an descending order of 10 negative numbers to test our insertion sort and quicksort.
+	A file containing an descending order of 100 negative numbers to test our insertion sort and quicksort.
+	A file containing an descending order of 1000 negative numbers to test our insertion sort and quicksort.
+	A file containing an descending order of 10 negative and positive numbers to test our insertion sort and quicksort.
+	A file containing an descending order of 100 negative and positive numbers to test our insertion sort and quicksort.
+	A file containing an descending order of 1000 negative and positive numbers to test our insertion sort and quicksort.
+	A file containing a random order of 10 negative and positive numbers to test our insertion sort and quicksort.
+	A file containing a random order of 100 negative and positive numbers to test our insertion sort and quicksort.
+	A file containing a random order of 1000 negative and positive numbers to test our insertion sort and quicksort.
+	A file containing a random order of 100 strings to test our insertion sort and quicksort.
+	A file containing the starting token as a negative number followed by mixture of negative and positive numbers to test if our number detection works and quicksort and insertion sort works. 
+	A file containing the starting token as a empty token followed by mixture of negative and positive numbers to test if our number detection works and quicksort and insertion sort works.
