@@ -1,0 +1,18 @@
+    /*
+     * Exam Details
+     *
+     * Question Types
+     *  Description/Identification
+     *      ex)What is blocking?
+     *      ex)What is malloc, what does it do?
+     *      - Make sure you know all methods, how to use them, and their return types
+     *  Function
+     *      ex)How to make read work if it doesnt give you all the bytes?
+     *      ex)How can malloc fail?
+     *      - Make sure you know how all methods can fail, or give unexpected results
+     *
+     *  Operation
+     *      ex)If this happens, what would you do to make the function work?
+     *      ex)How would you utilize malloc to do ...
+     *      - Make sure you can tell how a method failed, and when a method should be used and how its result should be interpreted
+     */
