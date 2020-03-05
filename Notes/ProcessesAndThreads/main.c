@@ -88,13 +88,14 @@ int main(int argc, char* argv[]) {
      *   - It is faster than creating processes
      *   - It is faster than switching processes
      *   - It is easier to pass data between threads because it shares the same heap
+     *     - Issues may occur with instruction interleaving
      * - Pros of Processes
      *   - If you want to load a new executable, you must use a process, threads cannot load new code
      *   - A separate way to handle signals/IO
      *     - If you want to handle signals/IO in 2 different ways you need 2 different processes
      *   - A separate address space (So other code cannot handle your data)
      *
-     * Scenario: Multi-threaded application representing a bank, user deposits and withdraws in 2 threads.
+     * Scenario: Multi-threaded application representing a bank, user deposits and withdraws in 2 threads running concurrently.
      * - We cannot simply mutli-thread it normally, because consistency will become an issue when these sets of instructions occur:
      *     Thread A			|	   Thread B
      *  load val to reg		|
@@ -130,6 +131,7 @@ int main(int argc, char* argv[]) {
      *   - Indicator variable: Also shared data, so the same issue can occur
      *
      * - MUTEX (Best Fix)
+     *   - Primitive: test_and_set
      *   - Make indicator change a single instruction
      *     - So that it can't be interrupted (45) and is runnable instantly to indicate an event (45)
      *     - Make it a blocking call
@@ -138,8 +140,8 @@ int main(int argc, char* argv[]) {
      *     - pthread_mutex_unlock
      *   - Synchronization
      *     - critical section: segment of code that modifies/uses shared data
-     *     - race condition: result of non-deterministic code that uses shared data
-     *     - deadlock: synchronization mistake
+     *     - race condition: non-deterministic code that uses shared data whose results are based on run order
+     *     - deadlock: synchronization that results in code that can never be run
      *   - ACID
      *     - A tomic
      *     - C onsistent
@@ -151,10 +153,53 @@ int main(int argc, char* argv[]) {
      *     - Keep critical sections as small as possible
      *     - Use only one mutex per shared data value
      *     - Naming Convention: mutex_<varname>_<counter>
-     *   - Example:
-     *       pthread_mutex_lock(someMutex);
-     *       sharedData += 1;
-     *       pthread_mutex_init();
+     *   - MUTEX Ordering
+     *     - Always resolved in lock order
+     *     - All locked threads are removed from the run queue and added back in lock order
+     *   - How to use
+     *     - TO Create:
+     *       - pthread_mutex_t alock;
+     *       - pthread_mutex_init(&alock);
+     *     - To Use:
+     *       - pthread_mutex_lock(&alock);
+     *       - pthread_mutex_unlock(&alock);
+     *
+     *   - Deadlocks
+     *     - What Deadlocks need to exist:
+     *         1. Mutual Exclusion (such as MUTEX)
+     *         2. Hold and Wait
+     *         3. No Preemption
+     *         4. Circular wait: Mutexes that depend on each other to unlock
+     *           - The only way to prevent deadlocks out of the four
+     *     - Avoiding Deadlocks:
+     *       - Maintain a global ordering on mutexes
+     *         - Always lock in the same order to maintain a total ordering on the mutexes
+     *       - Implement rising/falling permission phases
+     *         - When you unlock, don't lock until you've unlocked ALL mutexes
+     *     - Deadlock Example:
+     *       - Both threads are waiting on each other to unlock their respective mutexes
+     *      Thread A
+     *    pthread_mutex_lock(&mutex_varA_0);
+     *    pthread_mutex_lock(&mutex_varB_1); < Thread A waiting on the mutex that thread B holds
+     *
+     *      varA += 3*varB
+     *
+     *    pthread_mutex_unlock(&mutex_varA_0);
+     *    pthread_mutex_unlock(&mutex_varB_1);
+     *
+     *    Thread B
+     *    pthread_mutex_lock(&mutex_varB_1);
+     *    pthread_mutex_lock(&mutex_varA_0); < Thread B waiting on the mutex that thread A holds
+     *
+     *    varB -= (varA+2);
+     *
+     *    pthread_mutex_unlock(&mutex_varB_1);
+     *    pthread_mutex_unlock(&mutex_varA_0);
+     *
+     * pthread_join(...)
+     * - Like waitpid() for processes
+     *   - main wont return until all joins have returned
+     *   - If you do not join, then your process may end before all threads are done running
      */
 
     return 0;
