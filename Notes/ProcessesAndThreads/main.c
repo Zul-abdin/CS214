@@ -94,9 +94,34 @@ int main(int argc, char* argv[]) {
      *     - If you want to handle signals/IO in 2 different ways you need 2 different processes
      *   - A separate address space (So other code cannot handle your data)
      *
-     * Scenario: Multi-threaded application representing a bank.
+     * Scenario: Multi-threaded application representing a bank, user deposits and withdraws in 2 threads.
      * - We cannot simply mutli-thread it normally, because consistency will become an issue when these sets of instructions occur:
-     *   -...
+     *     Thread A			|	   Thread B
+     *  load val to reg		|
+	 *						|	load val to reg
+	 *    incr reg			|
+	 *   store to mm        |
+	 *						|	   decr reg
+	 *						|	 store to mm
+     *                      |
+     *                      |
+	 *     Thread A			|	   Thread B
+	 *  load val to reg     |
+	 *    incr reg			|
+	 *   store to mm        |
+	 * 						|	load val to reg
+	 * 						|	   decr reg
+	 * 						|	 store to mm
+     *                      |
+     *                      |
+	 *     Thread A			|	   Thread B
+	 * 						|	load val to reg
+	 * 						|	   decr reg
+	 * 						|	 store to mm
+	 *  load val to reg     |
+	 *    incr reg			|
+	 *   store to mm        |
+     *
      * - Issue created because there are 3 operations to replace and a signal can occur between any 2 operations
      * - Possible Fixes?
      *   - Give the user control of scheduling: Dangerous
