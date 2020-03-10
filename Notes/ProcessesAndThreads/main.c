@@ -167,8 +167,8 @@ int main(int argc, char* argv[]) {
      *   - Deadlocks
      *     - What Deadlocks need to exist:
      *         1. Mutual Exclusion (such as MUTEX)
-     *         2. Hold and Wait
-     *         3. No Preemption
+     *         2. Hold and Wait: Once you have a resource, but your waiting for another resource, you keep it
+     *         3. No Preemption: Once you have a mutex, only you can unlock it
      *         4. Circular wait: Mutexes that depend on each other to unlock
      *           - The only way to prevent deadlocks out of the four
      *     - Avoiding Deadlocks:
@@ -197,9 +197,38 @@ int main(int argc, char* argv[]) {
      *    pthread_mutex_unlock(&mutex_varA_0);
      *
      * pthread_join(...)
+     * - Joins the current stack with independent stack from the thread
      * - Like waitpid() for processes
-     *   - main wont return until all joins have returned
+     *   - Does not return until thread does
      *   - If you do not join, then your process may end before all threads are done running
+     *
+     * Synchronizing around Computation
+     * - Example: Threads are computing in phases, and you want to halt all after each phase and then all continue
+     * - Mechanism: Barrier
+     * - Primitive: fetch_and_decr
+     *
+     * Synchronizing around System Events
+     * - Pull notification (do not run until X happens/is the case
+     * - Mechanism: Condition Variable
+     * - Primitive: cmp_and_swap
+     *
+     * Monitor
+     * - Object-Oriented synchronization supervisor
+     * - Give all sync mechanisms to the Monitor to request a resource
+     * - Run a function to process the request to incorporate logic
+     *
+     * Semaphores
+     * - On lock: increment shared counter up to a max, block locks on max
+     * - On unlock, decrement shared counter down to 0, block unlocks on 0
+     * - Characteristics
+     *   - Asynchronous: insensitive to ordering (you can run any operation as many times in any order)
+     *   - Threadsafe: insensitive to identity (any context can call any of the operations in any order, NO OWNERSHIP)
+     * - Can be used in signal handlers with multiple threads, unlike mutexes (however this is still not recommended)
+     *   - Signal handlers have no control over context
+     *
+     * Binary Semaphore (similar-looking mechanics to a mutex)
+     * - no identity restrictions (anyone can 'unlock' it at any time)
+     * - no run ordering (any waiting context might unblock on a wait/notify)
      */
 
     return 0;
