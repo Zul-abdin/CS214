@@ -9,21 +9,23 @@
 #include <dirent.h>
 
 typedef struct _NODE_{
-	void* data;
+	char* data;
 	struct _NODE_* next;
 	struct _NODE_* prev;
 	int frequency;
 }node;
 
-typedef struct _hashtable_{
-	node* element;
-}hashtable;
-
+int itemCount = 0;
+int sizeHT = 1000;
+node* hashT[1000] = {NULL};
 
 void directoryTraverse(char* path, int recursive);
 void bufferFill(int fd, char* buffer, int bytesToRead);
+void readingFile(char* path, char* buffer, char* delimiters, int bufferSize, int delimiterSize);
 char* pathCreator(char* path, char* name);
-int sizeHT = 500;
+void freeNode(node* node);
+void insertHT(char* word);
+void printHT();
 
 int main(int argc, char** argv){
 //Assuming third argument is filepath atm, simple test
@@ -36,7 +38,7 @@ int main(int argc, char** argv){
 	_pathlocation_[strlen(argv[2])] = '\0';
 	directoryTraverse(_pathlocation_, 1);
 	
-	
+	printHT();
 	return 0;
 }
 
@@ -54,12 +56,16 @@ void directoryTraverse(char* path, int recursive){
 			continue;
 		}
 		if(curFile->d_type == DT_REG){
-			printf("%s\n", curFile->d_name);
+			printf("File Found: %s\n", curFile->d_name);
 			char* filepath = pathCreator(path, curFile->d_name);
 			printf("File path: %s\n", filepath);
 			
+			char delimiters[2] = {' ', '\n'};
+			char buffer[100] = {'\0'};
+			readingFile(filepath, buffer, delimiters, sizeof(buffer), sizeof(delimiters));
+			
 		}else if(curFile->d_type == DT_DIR && recursive){
-			printf("Directory Found\n%s\n", curFile->d_name);
+			printf("Directory Found: %s\n", curFile->d_name);
 			char* directorypath = pathCreator(path, curFile->d_name);
 			printf("Directory Location: %s\n", directorypath);
 			directoryTraverse(directorypath, recursive);
@@ -95,7 +101,7 @@ void readingFile(char* path, char* buffer, char* delimiters, int bufferSize, int
 	word = memset(word, '\0', sizeof(char) * defaultSize);
 	int wordpos = 0;
 	
-	while(buffer != '\0'){
+	while(buffer[0] != '\0'){
 		for(bufferPos = 0; bufferPos < (bufferSize/sizeof(buffer[0])); ++bufferPos){
 			int delimiterPos;
 			int isDelimiter = 0;
@@ -111,7 +117,8 @@ void readingFile(char* path, char* buffer, char* delimiters, int bufferSize, int
 				
 				defaultSize = 20;
 				wordpos = 0;
-				free(word);
+				word = (char *)malloc(sizeof(char) * defaultSize);
+				
 			}else{
 				if(wordpos >= defaultSize){
 				  	defaultSize = defaultSize * 2;
@@ -133,6 +140,7 @@ void readingFile(char* path, char* buffer, char* delimiters, int bufferSize, int
 		printf("Warning: File Descriptor would not close\n");
 	}
 }
+
 int getKey(char* word, int size){
 	int loop;
 	int sum = 0;
@@ -140,19 +148,58 @@ int getKey(char* word, int size){
 		sum += atoi(word);
 		word++;
 	}
-
+	int index = sum % size;
+	if(index < 0){
+		printf("Shouldn't ever occur\n");
+		index *= -1;
+	}
+	return index;
 }
+
 void insertHT(char* word){
 	int index = getKey(word, sizeHT);
 	node* newNode = (node *)malloc(sizeof(node) * 1);
-	newNode->data = &word;
-	if(hashT[index] != NULL){
+	newNode->data = word;
+	newNode->next = NULL;
+	newNode->prev = NULL;
+	newNode->frequency = 1;
 	
+	if(hashT[index] != NULL){
+		node* curNode = hashT[index];
+		node* prevNode = curNode;
+		while(curNode != NULL){
+			if(strcmp(curNode->data, newNode->data) == 0){
+				curNode->frequency = curNode->frequency + 1;
+				freeNode(newNode);
+				return;
+			}
+			prevNode = curNode;
+			curNode = curNode->next;
+		}
+		prevNode->next = newNode;
+		newNode->prev = prevNode;
 	}else{
-		hashT[index] = 
+		hashT[index] = newNode;
 	}
-
 }
+
+void printHT(){
+	int i = 0;
+	for(i = 0; i < sizeHT; i++){
+		if(hashT[i] != NULL){
+			while(hashT[i] != NULL){
+				printf("%s with frequency %d\n", hashT[i]->data, hashT[i]->frequency);
+				hashT[i] = hashT[i]->next;
+			}
+		}
+	}
+}
+
+void freeNode(node* curNode){
+	free(curNode->data);
+	free(curNode);
+}
+
 void bufferFill(int fd, char* buffer, int bytesToRead){
     int position = 0;
     int bytesRead = 0;
