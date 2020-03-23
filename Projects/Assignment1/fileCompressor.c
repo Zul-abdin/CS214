@@ -39,6 +39,7 @@ int main(int argc, char** argv){
 	directoryTraverse(_pathlocation_, 1);
 	
 	printHT();
+	printf("%d\n", itemCount);
 	return 0;
 }
 
@@ -117,7 +118,8 @@ void readingFile(char* path, char* buffer, char* delimiters, int bufferSize, int
 				
 				defaultSize = 20;
 				wordpos = 0;
-				word = (char *)malloc(sizeof(char) * defaultSize);
+				word = (char *)malloc(sizeof(char) * (defaultSize + 1));
+				memset(word, '\0', (sizeof(char) * (defaultSize + 1)));
 				
 			}else{
 				if(wordpos >= defaultSize){
@@ -160,6 +162,7 @@ void insertHT(char* word){
 	int index = getKey(word, sizeHT);
 	node* newNode = (node *)malloc(sizeof(node) * 1);
 	newNode->data = word;
+	printf("%s\n", newNode->data);
 	newNode->next = NULL;
 	newNode->prev = NULL;
 	newNode->frequency = 1;
@@ -181,6 +184,7 @@ void insertHT(char* word){
 	}else{
 		hashT[index] = newNode;
 	}
+	itemCount++;
 }
 
 void printHT(){
