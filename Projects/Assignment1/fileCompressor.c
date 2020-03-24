@@ -15,9 +15,23 @@ typedef struct _NODE_{
 	int frequency;
 }node;
 
+typedef struct _TREENODE_{
+    char* data;
+    int frequency;
+    struct _TREENODE_* left;
+    struct _TREENODE_* right;
+}treeNode;
+
+typedef struct _LLNODE_{
+    struct _TREENODE_* data;
+    struct _LLNODE_* next;
+}LLNode;
+
 int itemCount = 0;
 int sizeHT = 1000;
 node* hashT[1000] = {NULL};
+
+LLNode* head = NULL;
 
 void directoryTraverse(char* path, int recursive);
 void bufferFill(int fd, char* buffer, int bytesToRead);
@@ -26,6 +40,12 @@ char* pathCreator(char* path, char* name);
 void freeNode(node* node);
 void insertHT(char* word);
 void printHT();
+treeNode* createTreeNode(char* data, int frequency, treeNode* left, treeNode* right);
+void initializeLL();
+void LLSortedInsert(LLNode* newNode);
+void processLL();
+void processTree(treeNode* root, char* bitString);
+int isLeaf(treeNode* tNode);
 
 int main(int argc, char** argv){
 //Assuming third argument is filepath atm, simple test
@@ -40,6 +60,11 @@ int main(int argc, char** argv){
 	
 	printHT();
 	printf("%d\n", itemCount);
+
+	initializeLL();
+	processLL();
+	processTree(head->data, "");
+
 	return 0;
 }
 
@@ -190,10 +215,11 @@ void insertHT(char* word){
 void printHT(){
 	int i = 0;
 	for(i = 0; i < sizeHT; i++){
-		if(hashT[i] != NULL){
-			while(hashT[i] != NULL){
-				printf("%s with frequency %d\n", hashT[i]->data, hashT[i]->frequency);
-				hashT[i] = hashT[i]->next;
+	    node* curr = hashT[i];
+		if(curr != NULL){
+			while(curr != NULL){
+				printf("%s with frequency %d\n", curr->data, curr->frequency);
+                curr = curr->next;
 			}
 		}
 	}
@@ -220,4 +246,88 @@ void bufferFill(int fd, char* buffer, int bytesToRead){
         }
         bytesRead += status;
     }while(bytesRead < bytesToRead);
+}
+
+treeNode* createTreeNode(char* data, int frequency, treeNode* left, treeNode* right){
+    treeNode* newNode = (treeNode*)malloc(sizeof(treeNode));
+    newNode->data = data;
+    newNode->frequency = frequency;
+    newNode->left = left;
+    newNode->right = right;
+    return newNode;
+}
+
+void initializeLL(){
+    int i = 0;
+    for(i = 0; i < sizeHT; i++){
+        if(hashT[i] != NULL){
+            while(hashT[i] != NULL){
+                LLNode* newNode = (LLNode*)malloc(sizeof(LLNode));
+                newNode->data = createTreeNode(hashT[i]->data, hashT[i]->frequency, NULL, NULL);
+                newNode->next = NULL;
+                LLSortedInsert(newNode);
+                hashT[i] = hashT[i]->next;
+            }
+        }
+    }
+}
+
+void LLSortedInsert(LLNode* newNode){
+    if(head == NULL || head->data->frequency >= newNode->data->frequency){
+        newNode->next = head;
+        head = newNode;
+    } else {
+        LLNode* curr = head;
+        while(curr->next != NULL && curr->next->data->frequency < newNode->data->frequency){
+            curr = curr->next;
+        }
+        newNode->next = curr->next;
+        curr->next = newNode;
+    }
+}
+
+void processLL(){
+    while(head->next != NULL){
+        LLNode* first = head;
+        LLNode* second = head->next;
+        treeNode* root = createTreeNode(NULL, first->data->frequency + second->data->frequency, first->data, second->data);
+        LLNode* newNode = (LLNode*)malloc(sizeof(LLNode));
+        newNode->data = root;
+        newNode->next = NULL;
+        LLSortedInsert(newNode);
+        head = head->next->next;
+        free(first);
+        free(second);
+    }
+}
+
+void processTree(treeNode* root, char* bitString){
+    if(root == NULL){
+        return;
+    }
+    if(isLeaf(root)){
+        printf("%s...........%s\n", root->data, bitString);
+    }
+
+    char* leftBitString = (char*)malloc(strlen(bitString) + 2);
+    memcpy(leftBitString, bitString, strlen(bitString) + 1);
+    leftBitString[strlen(bitString)] = '0';
+    leftBitString[strlen(bitString) + 1] = '\0';
+    processTree(root->left, leftBitString);
+    free(leftBitString);
+
+    char* rightBitString = (char*)malloc(strlen(bitString) + 2);
+    memcpy(rightBitString, bitString, strlen(bitString) + 1);
+    rightBitString[strlen(bitString)] = '1';
+    rightBitString[strlen(bitString) + 1] = '\0';
+    processTree(root->right, rightBitString);
+    free(rightBitString);
+}
+
+int isLeaf(treeNode* tNode){
+    if(tNode->left == NULL && tNode->right == NULL){
+        return 1;
+    } else {
+        return 0;
+    }
 }
