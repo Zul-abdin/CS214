@@ -33,7 +33,7 @@ node* hashT[1000] = {NULL};
 
 LLNode* head = NULL;
 
-void directoryTraverse(char* path, int recursive);
+void directoryTraverse(char* path, int recursive, int mode);
 void bufferFill(int fd, char* buffer, int bytesToRead);
 void readingFile(char* path, char* buffer, char* delimiters, int bufferSize, int delimiterSize);
 char* pathCreator(char* path, char* name);
@@ -48,16 +48,52 @@ void processTree(treeNode* root, char* bitString);
 int isLeaf(treeNode* tNode);
 
 int main(int argc, char** argv){
-//Assuming third argument is filepath atm, simple test
-	if(argc != 3 && argc != 4){
-		printf("Fatal Error: Not Enough Arguments\n");
+	if(argc != 4 && argc != 5){
+		printf("Fatal Error: too many or too few arguments\n");
 		return 0;
 	}
-	char* _pathlocation_ = malloc(sizeof(char) * (strlen(argv[2]) + 1));
-	memcpy(_pathlocation_, argv[2], strlen(argv[2]));
-	_pathlocation_[strlen(argv[2])] = '\0';
-	directoryTraverse(_pathlocation_, 1);
-	
+	if(strlen(argv[1]) == 2 && argv[1][0] == '-' ){
+			if(argv[1][1] == 'R'){
+				if(strlen(argv[2]) == 2 && argv[2][0] == '-'){
+					if(argv[2][0] == '-'){
+						if(argv[2][1] == 'b' && argc == 4){ //build recursion
+							char* _pathlocation_ = malloc(sizeof(char) * (strlen(argv[3]) + 1));
+							memcpy(_pathlocation_, argv[3], strlen(argv[3]));
+							_pathlocation_[strlen(argv[3])] = '\0';
+							directoryTraverse(_pathlocation_, 1, 0);
+						}else if(argv[2][1] == 'c' && argc == 5){ //compress recursion
+						
+						}else if(argv[2][1] == 'd' && argc == 5){ //decompress recursion
+							
+						}else{
+							printf("Fatal Error: Wrong Arguments\n");
+							return 0;
+						}
+					}else{
+						printf("Fatal Error: Wrong Arguments\n");
+						return 0;
+					}
+				}else{
+					printf("Fatal Error: Wrong Arguments\n");
+					return 0;
+				}
+			}else if(argv[1][1] == 'b' && argc == 4){ //build mode no recursion
+					char* _pathlocation_ = malloc(sizeof(char) * (strlen(argv[2]) + 1));
+					memcpy(_pathlocation_, argv[2], strlen(argv[2]));
+					_pathlocation_[strlen(argv[2])] = '\0';
+					directoryTraverse(_pathlocation_, 0, 0);
+			}else if(argv[1][1] == 'c' && argc == 4){ //compress no recursion
+				//decompress algorithm
+			}else if(argv[1][1] == 'd' && argc == 4){ //decompress no recursion
+				//compress algorithm
+			}else{
+				printf("Fatal Error: Wrong Arguments\n");
+				return 0;
+			}
+	}else{
+		printf("Fatal Error: Wrong Arguments\n");
+		return 0;
+	}
 	printHT();
 	printf("%d\n", itemCount);
 
@@ -67,13 +103,19 @@ int main(int argc, char** argv){
 
 	return 0;
 }
-
-void directoryTraverse(char* path, int recursive){
+/*
+	DirectoryTraverse modes:
+	0 = build
+	1 = compress
+	2 = decompress
+*/
+void directoryTraverse(char* path, int recursive, int mode){ 
 	DIR* dirPath = opendir(path);
 	if(!dirPath){
 		printf("Fatal Error: Directory path does not exist!\n");
 		closedir(dirPath);
-		return;
+		free(path);
+		exit(0);
 	}
 	struct dirent* curFile = readdir(dirPath);
 	while(curFile != NULL){
@@ -85,16 +127,17 @@ void directoryTraverse(char* path, int recursive){
 			printf("File Found: %s\n", curFile->d_name);
 			char* filepath = pathCreator(path, curFile->d_name);
 			printf("File path: %s\n", filepath);
-			
-			char delimiters[2] = {' ', '\n'};
-			char buffer[100] = {'\0'};
-			readingFile(filepath, buffer, delimiters, sizeof(buffer), sizeof(delimiters));
+			if(mode == 0){
+				char delimiters[2] = {' ', '\n'};
+				char buffer[100] = {'\0'};
+				readingFile(filepath, buffer, delimiters, sizeof(buffer), sizeof(delimiters));
+			}
 			
 		}else if(curFile->d_type == DT_DIR && recursive){
 			printf("Directory Found: %s\n", curFile->d_name);
 			char* directorypath = pathCreator(path, curFile->d_name);
 			printf("Directory Location: %s\n", directorypath);
-			directoryTraverse(directorypath, recursive);
+			directoryTraverse(directorypath, recursive, mode);
 		}else{
 			
 		}
@@ -159,9 +202,13 @@ void readingFile(char* path, char* buffer, char* delimiters, int bufferSize, int
 		  	  		wordpos++;
 		  	  	}
 			}
-			
 		}
 		bufferFill(fd, buffer, bufferSize);	
+	}
+	if(word[0] != '\0'){ //Gets the last token if it does not end with a delimiter (treats EOF as delimiter)
+		insertHT(word);
+	}else{
+		free(word);
 	}
 	if(close(fd) < 0){
 		printf("Warning: File Descriptor would not close\n");
@@ -305,9 +352,9 @@ void processTree(treeNode* root, char* bitString){
     if(root == NULL){
         return;
     }
-    if(isLeaf(root)){
-        printf("%s...........%s\n", root->data, bitString);
-    }
+	 if(isLeaf(root)){
+        printf("%s\t%s\n", root->data, bitString);
+    }	
 
     char* leftBitString = (char*)malloc(strlen(bitString) + 2);
     memcpy(leftBitString, bitString, strlen(bitString) + 1);
@@ -322,6 +369,7 @@ void processTree(treeNode* root, char* bitString){
     rightBitString[strlen(bitString) + 1] = '\0';
     processTree(root->right, rightBitString);
     free(rightBitString);
+	
 }
 
 int isLeaf(treeNode* tNode){
