@@ -35,7 +35,7 @@ LLNode* head = NULL;
 
 void directoryTraverse(char* path, int recursive, int mode);
 void bufferFill(int fd, char* buffer, int bytesToRead);
-void readingFile(char* path, char* buffer, char* delimiters, int bufferSize, int delimiterSize);
+void tokenCreate(char* path, char* buffer, char* delimiters, int bufferSize, int delimiterSize);
 char* pathCreator(char* path, char* name);
 void freeNode(node* node);
 void insertHT(char* word);
@@ -130,7 +130,7 @@ void directoryTraverse(char* path, int recursive, int mode){
 			if(mode == 0){
 				char delimiters[2] = {' ', '\n'};
 				char buffer[100] = {'\0'};
-				readingFile(filepath, buffer, delimiters, sizeof(buffer), sizeof(delimiters));
+				tokenCreate(filepath, buffer, delimiters, sizeof(buffer), sizeof(delimiters));
 			}
 			
 		}else if(curFile->d_type == DT_DIR && recursive){
@@ -156,7 +156,7 @@ char* pathCreator(char* path, char* name){
 	return newpath;
 }
 
-void readingFile(char* path, char* buffer, char* delimiters, int bufferSize, int delimiterSize){
+void tokenCreate(char* path, char* buffer, char* delimiters, int bufferSize, int delimiterSize){
 	int fd = open(path, O_RDONLY);
 	if(fd == -1){
 		printf("Error: File does not exist: should not be possible\n");
@@ -172,7 +172,7 @@ void readingFile(char* path, char* buffer, char* delimiters, int bufferSize, int
 	
 	while(buffer[0] != '\0'){
 		for(bufferPos = 0; bufferPos < (bufferSize/sizeof(buffer[0])); ++bufferPos){
-			int delimiterPos;
+			/*int delimiterPos;
 			int isDelimiter = 0;
 			for(delimiterPos = 0; delimiterPos < (delimiterSize/sizeof(delimiters[0])); ++delimiterPos){
 				if(buffer[bufferPos] == delimiters[delimiterPos]){
@@ -180,8 +180,13 @@ void readingFile(char* path, char* buffer, char* delimiters, int bufferSize, int
 					break;
 				}
 			}
-			
-			if(isDelimiter){
+			*/
+			if(isspace(buffer[bufferPos])){
+				char* whitespaceholder = (char*) malloc(sizeof(char) * (1 + 1)); //One character for the whitespace character and one for terminal character for strings
+				memset(whitespaceholder, '\0', (sizeof(char) * (1 + 1)));
+				memcpy(whitespaceholder, (buffer + bufferPos), sizeof(char));
+				
+				insertHT(whitespaceholder);
 				insertHT(word);
 				
 				defaultSize = 20;
