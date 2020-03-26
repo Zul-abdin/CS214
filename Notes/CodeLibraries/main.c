@@ -7,7 +7,7 @@
 
 int main(){
 
-    printf("\r\n");
+    printf("%d\n", plusone(99));
 
     return 0;
 }
