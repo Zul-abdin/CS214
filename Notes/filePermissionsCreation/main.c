@@ -29,7 +29,7 @@ int main() {
      *     - chmod g+w test.c
      *     - chmod a-r test.c
      *     - chmod o+x test.c
-     *   - chmod <posBitStringRepresentation> <file>
+     *   - chmod <tripleOctet> <file>
      *     - Lets say you cant the following permissions for test.c:
      *            u   g   o
      *           rwx rwx rwx
