@@ -13,6 +13,7 @@ typedef struct _NODE_{
 	struct _NODE_* next;
 	struct _NODE_* prev;
 	int frequency;
+	int whitespace;
 }node;
 
 typedef struct _TREENODE_{
@@ -28,17 +29,17 @@ typedef struct _LLNODE_{
 }LLNode;
 
 int itemCount = 0;
-int sizeHT = 1000;
-node* hashT[1000] = {NULL};
+int sizeHT = 10;
+node** hashT = NULL;
 
 LLNode* head = NULL;
 
 void directoryTraverse(char* path, int recursive, int mode);
 void bufferFill(int fd, char* buffer, int bytesToRead);
-void tokenCreate(char* path, char* buffer, char* delimiters, int bufferSize, int delimiterSize);
+void fileReading(char* path, char* buffer, int bufferSize, int mode);
 char* pathCreator(char* path, char* name);
 void freeNode(node* node);
-void insertHT(char* word);
+void insertHT(char* word, int whitespace, int frequency, int rehashing);
 void printHT();
 treeNode* createTreeNode(char* data, int frequency, treeNode* left, treeNode* right);
 void initializeLL();
@@ -46,6 +47,8 @@ void LLSortedInsert(LLNode* newNode);
 void processLL();
 void processTree(treeNode* root, char* bitString);
 int isLeaf(treeNode* tNode);
+void freeHT(node** head);
+void rehash();
 
 int main(int argc, char** argv){
 	if(argc != 4 && argc != 5){
@@ -57,6 +60,7 @@ int main(int argc, char** argv){
 				if(strlen(argv[2]) == 2 && argv[2][0] == '-'){
 					if(argv[2][0] == '-'){
 						if(argv[2][1] == 'b' && argc == 4){ //build recursion
+							hashT = (node**) calloc(sizeHT, sizeof(node*));
 							char* _pathlocation_ = malloc(sizeof(char) * (strlen(argv[3]) + 1));
 							memcpy(_pathlocation_, argv[3], strlen(argv[3]));
 							_pathlocation_[strlen(argv[3])] = '\0';
@@ -78,6 +82,7 @@ int main(int argc, char** argv){
 					return 0;
 				}
 			}else if(argv[1][1] == 'b' && argc == 4){ //build mode no recursion
+					hashT = (node**) calloc(sizeHT, sizeof(node*));
 					char* _pathlocation_ = malloc(sizeof(char) * (strlen(argv[2]) + 1));
 					memcpy(_pathlocation_, argv[2], strlen(argv[2]));
 					_pathlocation_[strlen(argv[2])] = '\0';
@@ -96,11 +101,11 @@ int main(int argc, char** argv){
 	}
 	printHT();
 	printf("%d\n", itemCount);
-
+	
 	initializeLL();
 	processLL();
 	processTree(head->data, "");
-
+	freeHT(hashT);
 	return 0;
 }
 /*
@@ -128,9 +133,9 @@ void directoryTraverse(char* path, int recursive, int mode){
 			char* filepath = pathCreator(path, curFile->d_name);
 			printf("File path: %s\n", filepath);
 			if(mode == 0){
-				char delimiters[2] = {' ', '\n'};
+				//char delimiters[2] = {' ', '\n'};
 				char buffer[100] = {'\0'};
-				tokenCreate(filepath, buffer, delimiters, sizeof(buffer), sizeof(delimiters));
+				fileReading(filepath, buffer, sizeof(buffer), mode);
 			}
 			
 		}else if(curFile->d_type == DT_DIR && recursive){
@@ -155,8 +160,13 @@ char* pathCreator(char* path, char* name){
 	newpath[strlen(newpath)] = '\0';
 	return newpath;
 }
-
-void tokenCreate(char* path, char* buffer, char* delimiters, int bufferSize, int delimiterSize){
+/*
+	fileReading modes:
+	0 -> build
+	1 -> compress
+	2 -> decompress
+*/
+void fileReading(char* path, char* buffer, int bufferSize, int mode){ //Old Template: void fileReading(char* path, char* buffer, char* delimiters, int bufferSize, int delimiterSize);
 	int fd = open(path, O_RDONLY);
 	if(fd == -1){
 		printf("Error: File does not exist: should not be possible\n");
@@ -182,12 +192,18 @@ void tokenCreate(char* path, char* buffer, char* delimiters, int bufferSize, int
 			}
 			*/
 			if(isspace(buffer[bufferPos])){
-				char* whitespaceholder = (char*) malloc(sizeof(char) * (1 + 1)); //One character for the whitespace character and one for terminal character for strings
-				memset(whitespaceholder, '\0', (sizeof(char) * (1 + 1)));
-				memcpy(whitespaceholder, (buffer + bufferPos), sizeof(char));
+				if(mode == 0){
+					char* whitespaceholder = (char*) malloc(sizeof(char) * (1 + 1)); //One character for the whitespace character and one for terminal character for strings
+					memset(whitespaceholder, '\0', (sizeof(char) * (1 + 1)));
+					memcpy(whitespaceholder, (buffer + bufferPos), sizeof(char));
 				
-				insertHT(whitespaceholder);
-				insertHT(word);
+					insertHT(whitespaceholder, 1, 1, 0);
+					insertHT(word, 0, 1, 0);
+					if(itemCount == sizeHT){
+						rehash();
+					}
+				}
+				
 				
 				defaultSize = 20;
 				wordpos = 0;
@@ -210,8 +226,12 @@ void tokenCreate(char* path, char* buffer, char* delimiters, int bufferSize, int
 		}
 		bufferFill(fd, buffer, bufferSize);	
 	}
-	if(word[0] != '\0'){ //Gets the last token if it does not end with a delimiter (treats EOF as delimiter)
-		insertHT(word);
+	if(mode == 0 && word[0] != '\0'){ //Gets the last token if it does not end with a delimiter (treats EOF as delimiter) 
+		insertHT(word, 0, 1, 0);
+	}else if(mode == 1 && word[0] != '\0'){
+
+	}else if(mode == 2 && word[0] != '\0'){
+	
 	}else{
 		free(word);
 	}
@@ -221,13 +241,12 @@ void tokenCreate(char* path, char* buffer, char* delimiters, int bufferSize, int
 }
 
 int getKey(char* word, int size){
-	int loop;
-	int sum = 0;
-	while(*word){
-		sum += atoi(word);
-		word++;
+	int loop = 0;
+	int hash = 0;
+	for(loop = 0; loop < strlen(word); ++loop){
+		hash = ((hash << 5) - hash) + word[loop];
 	}
-	int index = sum % size;
+	int index = hash % size;
 	if(index < 0){
 		printf("Shouldn't ever occur\n");
 		index *= -1;
@@ -235,15 +254,34 @@ int getKey(char* word, int size){
 	return index;
 }
 
-void insertHT(char* word){
+void rehash(){
+	sizeHT = sizeHT * 2;
+	node** newHT = (node**) calloc(sizeHT,sizeof(node*));
+	node** oldHead = hashT;
+	hashT = newHT;
+	
+	int i = 0;
+	for(i = 0; i < (sizeHT/2); ++i){
+		node* curNode = oldHead[i];
+		while(curNode != NULL){
+			insertHT(curNode->data, curNode->whitespace, curNode->frequency, 1);
+			node* temp = curNode;
+			curNode = curNode->next;
+			free(temp);
+		}
+	}
+	free(oldHead);
+}
+
+void insertHT(char* word, int whitespace, int frequency, int rehashing){
 	int index = getKey(word, sizeHT);
 	node* newNode = (node *)malloc(sizeof(node) * 1);
 	newNode->data = word;
 	printf("%s\n", newNode->data);
 	newNode->next = NULL;
 	newNode->prev = NULL;
-	newNode->frequency = 1;
-	
+	newNode->frequency = frequency;
+	newNode->whitespace = whitespace;
 	if(hashT[index] != NULL){
 		node* curNode = hashT[index];
 		node* prevNode = curNode;
@@ -261,20 +299,32 @@ void insertHT(char* word){
 	}else{
 		hashT[index] = newNode;
 	}
-	itemCount++;
+	if(rehashing == 0){
+		itemCount++;
+	}
 }
 
 void printHT(){
 	int i = 0;
 	for(i = 0; i < sizeHT; i++){
-	    node* curr = hashT[i];
-		if(curr != NULL){
-			while(curr != NULL){
+	   node* curr = hashT[i];
+		while(curr != NULL){
 				printf("%s with frequency %d\n", curr->data, curr->frequency);
-                curr = curr->next;
-			}
+            curr = curr->next;
 		}
 	}
+}
+
+void freeHT(node** head){
+	int i = 0;
+	for(i = 0; i < sizeHT; i++){
+		while(head[i] != NULL){
+			node* temp = head[i];
+			head[i] = head[i]->next;
+			freeNode(temp);
+		}
+	}
+	free(head);
 }
 
 void freeNode(node* curNode){
@@ -312,14 +362,13 @@ treeNode* createTreeNode(char* data, int frequency, treeNode* left, treeNode* ri
 void initializeLL(){
     int i = 0;
     for(i = 0; i < sizeHT; i++){
-        if(hashT[i] != NULL){
-            while(hashT[i] != NULL){
-                LLNode* newNode = (LLNode*)malloc(sizeof(LLNode));
-                newNode->data = createTreeNode(hashT[i]->data, hashT[i]->frequency, NULL, NULL);
-                newNode->next = NULL;
-                LLSortedInsert(newNode);
-                hashT[i] = hashT[i]->next;
-            }
+    		node* hashTnode = hashT[i];
+         while(hashTnode != NULL){
+              LLNode* newNode = (LLNode*)malloc(sizeof(LLNode));
+              newNode->data = createTreeNode(hashTnode->data, hashTnode->frequency, NULL, NULL);
+              newNode->next = NULL;
+              LLSortedInsert(newNode);
+              hashTnode = hashTnode->next;
         }
     }
 }
@@ -346,10 +395,11 @@ void processLL(){
         LLNode* newNode = (LLNode*)malloc(sizeof(LLNode));
         newNode->data = root;
         newNode->next = NULL;
-        LLSortedInsert(newNode);
         head = head->next->next;
         free(first);
         free(second);
+        LLSortedInsert(newNode);
+
     }
 }
 
