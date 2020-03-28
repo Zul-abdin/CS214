@@ -30,7 +30,7 @@ typedef struct _LLNODE_{
 }LLNode;
 
 int itemCount = 0;
-int sizeHT = 10;
+int sizeHT = 100;
 node** hashT = NULL;
 
 LLNode* head = NULL;
@@ -113,6 +113,12 @@ int main(int argc, char** argv){
 	//processTree(head->data, "");
 	fileWriting("HuffmanCodebook.txt");
 	freeHT(hashT);
+	while(head != NULL){
+		LLNode* temp = head;
+		head = head->next;
+		freeLLnode(temp);
+	}
+
 	return 0;
 }
 /*
@@ -144,7 +150,7 @@ void directoryTraverse(char* path, int recursive, int mode){
 				char buffer[100] = {'\0'};
 				fileReading(filepath, buffer, sizeof(buffer), mode);
 			}
-			
+			free(filepath);
 		}else if(curFile->d_type == DT_DIR && recursive){
 			printf("Directory Found: %s\n", curFile->d_name);
 			char* directorypath = pathCreator(path, curFile->d_name);
@@ -407,7 +413,6 @@ void processLL(){
         free(first);
         free(second);
         LLSortedInsert(newNode);
-
     }
 }
 void freeLLnode(LLNode* node){
@@ -431,10 +436,25 @@ void freeTreenode(treeNode* root){
 }
 
 char* sequenceReplace(char* word){
-	char* temp = (char*) malloc(sizeof(char) * strlen(word) + 2);
-	memset(temp, '\0', strlen(word) + 2 * sizeof(char));
-	temp[0] = '\\';
-	memcpy(temp+1, word, strlen(word));
+	char* temp = malloc(sizeof(char) * 2);
+	memset(temp, '\0', (sizeof(char) * 2));
+	char temp1 = word[0];
+	switch(temp1){
+		case '\n': temp[0] = 'n';
+					break;
+		case ' ': temp[0] = 's';
+					break;
+		case '\t': temp[0] = 't';
+					break;
+		case '\v': temp[0] = 'v';
+					break;
+		case '\f': temp[0] = 'f';
+					break;
+		case '\r': temp[0] = 'r';
+					break;
+		default: printf("ERROR: whitespace is not actually a whitespace character\n");
+					break;
+	}
 	free(word);
 	return temp;
 }
@@ -448,9 +468,9 @@ void fileWriting(char* filename){
 void writeToFile(char* word, int bytesToWrite, int whitespace, int fd){
 	int bytesWritten = 0;
 	int status = 0;
-	if(whitespace){
+	if(whitespace){ //This case: bytesToWrite should be 1 so we do not need to change it when we turn whitespace to its counterpart
 		writeToFile("ESCAPESEQ", strlen("ESCAPESEQ"), 0, fd);
-		word = sequenceReplace(word);
+		word = sequenceReplace(word); 
 	}
 	while(bytesWritten < bytesToWrite){
 		status = write(fd, (word + bytesWritten), (bytesToWrite - bytesWritten));
@@ -459,6 +479,9 @@ void writeToFile(char* word, int bytesToWrite, int whitespace, int fd){
 			return;
 		}
 		bytesWritten += status;
+	}
+	if(whitespace){
+		free(word);
 	}
 }
 
