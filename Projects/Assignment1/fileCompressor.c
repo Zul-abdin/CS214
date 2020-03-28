@@ -19,6 +19,7 @@ typedef struct _NODE_{
 typedef struct _TREENODE_{
     char* data;
     int frequency;
+    int whitespace;
     struct _TREENODE_* left;
     struct _TREENODE_* right;
 }treeNode;
@@ -41,14 +42,19 @@ char* pathCreator(char* path, char* name);
 void freeNode(node* node);
 void insertHT(char* word, int whitespace, int frequency, int rehashing);
 void printHT();
-treeNode* createTreeNode(char* data, int frequency, treeNode* left, treeNode* right);
+treeNode* createTreeNode(char* data, int frequency, treeNode* left, treeNode* right, int whitespace);
 void initializeLL();
 void LLSortedInsert(LLNode* newNode);
 void processLL();
-void processTree(treeNode* root, char* bitString);
+void processTree(treeNode* root, char* bitString, int fd);
 int isLeaf(treeNode* tNode);
 void freeHT(node** head);
 void rehash();
+void freeTreenode(treeNode* root);
+void freeLLnode(LLNode* node);
+void writeToFile(char* word, int bytesToWrite, int whitespace, int fd);
+void fileWriting(char*);
+char* sequenceReplace(char*);
 
 int main(int argc, char** argv){
 	if(argc != 4 && argc != 5){
@@ -104,7 +110,8 @@ int main(int argc, char** argv){
 	
 	initializeLL();
 	processLL();
-	processTree(head->data, "");
+	//processTree(head->data, "");
+	fileWriting("HuffmanCodebook.txt");
 	freeHT(hashT);
 	return 0;
 }
@@ -350,10 +357,11 @@ void bufferFill(int fd, char* buffer, int bytesToRead){
     }while(bytesRead < bytesToRead);
 }
 
-treeNode* createTreeNode(char* data, int frequency, treeNode* left, treeNode* right){
+treeNode* createTreeNode(char* data, int frequency, treeNode* left, treeNode* right, int whitespace){
     treeNode* newNode = (treeNode*)malloc(sizeof(treeNode));
     newNode->data = data;
     newNode->frequency = frequency;
+    newNode->whitespace = whitespace;
     newNode->left = left;
     newNode->right = right;
     return newNode;
@@ -365,7 +373,7 @@ void initializeLL(){
     		node* hashTnode = hashT[i];
          while(hashTnode != NULL){
               LLNode* newNode = (LLNode*)malloc(sizeof(LLNode));
-              newNode->data = createTreeNode(hashTnode->data, hashTnode->frequency, NULL, NULL);
+              newNode->data = createTreeNode(hashTnode->data, hashTnode->frequency, NULL, NULL, hashTnode->whitespace);
               newNode->next = NULL;
               LLSortedInsert(newNode);
               hashTnode = hashTnode->next;
@@ -391,7 +399,7 @@ void processLL(){
     while(head->next != NULL){
         LLNode* first = head;
         LLNode* second = head->next;
-        treeNode* root = createTreeNode(NULL, first->data->frequency + second->data->frequency, first->data, second->data);
+        treeNode* root = createTreeNode(NULL, first->data->frequency + second->data->frequency, first->data, second->data, 0);
         LLNode* newNode = (LLNode*)malloc(sizeof(LLNode));
         newNode->data = root;
         newNode->next = NULL;
@@ -402,27 +410,82 @@ void processLL(){
 
     }
 }
+void freeLLnode(LLNode* node){
+	freeTreenode(node->data);
+	free(node);
+}
 
-void processTree(treeNode* root, char* bitString){
+void freeTreenode(treeNode* root){	
+	/*if(root == NULL){ //some error checking
+		return;
+	}
+	*/
+	free(root->data);
+	if(root->left != NULL){
+		freeTreenode(root->left);
+	}
+	if(root->right != NULL){
+		freeTreenode(root->right);
+	}
+	free(root);
+}
+
+char* sequenceReplace(char* word){
+	char* temp = (char*) malloc(sizeof(char) * strlen(word) + 2);
+	memset(temp, '\0', strlen(word) + 2 * sizeof(char));
+	temp[0] = '\\';
+	memcpy(temp+1, word, strlen(word));
+	free(word);
+	return temp;
+}
+void fileWriting(char* filename){
+	int fd = open(filename, O_WRONLY | O_TRUNC | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
+	writeToFile("ESCAPESEQ", strlen("ESCAPESEQ"), 0, fd);
+	writeToFile("\n", strlen("\n"), 0, fd);
+	processTree(head->data, "", fd);
+	close(fd);
+}
+void writeToFile(char* word, int bytesToWrite, int whitespace, int fd){
+	int bytesWritten = 0;
+	int status = 0;
+	if(whitespace){
+		writeToFile("ESCAPESEQ", strlen("ESCAPESEQ"), 0, fd);
+		word = sequenceReplace(word);
+	}
+	while(bytesWritten < bytesToWrite){
+		status = write(fd, (word + bytesWritten), (bytesToWrite - bytesWritten));
+		if(status == -1){
+			printf("Error: write failed\n");
+			return;
+		}
+		bytesWritten += status;
+	}
+}
+
+void processTree(treeNode* root, char* bitString, int fd){
     if(root == NULL){
         return;
     }
 	 if(isLeaf(root)){
         printf("%s\t%s\n", root->data, bitString);
+        writeToFile(root->data, strlen(root->data), root->whitespace, fd);
+        writeToFile("\t", strlen("\t"), 0, fd);
+        writeToFile(bitString, strlen(bitString), 0, fd);
+        writeToFile("\n", strlen("\n"), 0, fd);
     }	
 
     char* leftBitString = (char*)malloc(strlen(bitString) + 2);
     memcpy(leftBitString, bitString, strlen(bitString) + 1);
     leftBitString[strlen(bitString)] = '0';
     leftBitString[strlen(bitString) + 1] = '\0';
-    processTree(root->left, leftBitString);
+    processTree(root->left, leftBitString, fd);
     free(leftBitString);
 
     char* rightBitString = (char*)malloc(strlen(bitString) + 2);
     memcpy(rightBitString, bitString, strlen(bitString) + 1);
     rightBitString[strlen(bitString)] = '1';
     rightBitString[strlen(bitString) + 1] = '\0';
-    processTree(root->right, rightBitString);
+    processTree(root->right, rightBitString, fd);
     free(rightBitString);
 	
 }
