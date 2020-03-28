@@ -170,7 +170,7 @@ char* pathCreator(char* path, char* name){
 	memcpy(newpath, path, strlen(path));
 	newpath[strlen(path)] = '/';
 	memcpy((newpath + strlen(path) + 1), name, (strlen(name)));
-	newpath[strlen(newpath)] = '\0';
+	newpath[strlen(name) + strlen(path) + 1] = '\0';
 	return newpath;
 }
 /*
