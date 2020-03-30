@@ -38,7 +38,7 @@ LLNode* head = NULL;
 
 void directoryTraverse(char* path, int recursive, int mode);
 void bufferFill(int fd, char* buffer, int bytesToRead);
-void fileReading(char* path, char* buffer, int bufferSize, int mode);
+void fileReading(char* path, char* buffer, int bufferSize, int mode, int);
 char* pathCreator(char* path, char* name);
 void freeNode(node* node);
 void insertHT(char* word, int whitespace, int frequency, int rehashing, char* bitstring);
@@ -58,7 +58,8 @@ void fileWriting(char*);
 char* sequenceReplace(char*);
 void compress(char* huffmancodebook);
 char* doubleStringSize(char* word, int size);
-
+char* getWhitespace(char*);
+void findBitstring(char* word, int fd);
 
 int main(int argc, char** argv){
 	if(argc != 4 && argc != 5){
@@ -114,17 +115,17 @@ int main(int argc, char** argv){
 					fileWriting("HuffmanCodebook.txt");
 					freeHT(hashT);
 			}else if(argv[1][1] == 'c' && argc == 4){ //compress no recursion
-				hashT = (node**) calloc(sizeHT, sizeof(node*));
+				hashT = (node**) calloc(sizeHT, sizeof(node*));				
+				
+				char buffer[100] = {'\0'};
+				fileReading(argv[3],buffer,sizeof(buffer), 3, 0);
+				printHT();
+				printf("%d\n", itemCount);
+				
 				char* _pathlocation_ = malloc(sizeof(char) * (strlen(argv[2]) + 1));
 				memcpy(_pathlocation_, argv[2], strlen(argv[2]));
 				_pathlocation_[strlen(argv[2])] = '\0';
-				directoryTraverse(_pathlocation_, 1, 1);
-				
-				
-				char buffer[100] = {'\0'};
-				fileReading(argv[3],buffer,sizeof(buffer),1);
-				printHT();
-				printf("%d\n", itemCount);
+				directoryTraverse(_pathlocation_, 0, 1);
 				
 			}else if(argv[1][1] == 'd' && argc == 4){ //decompress no recursion
 				
@@ -168,10 +169,15 @@ void directoryTraverse(char* path, int recursive, int mode){
 			printf("File Found: %s\n", curFile->d_name);
 			char* filepath = pathCreator(path, curFile->d_name);
 			printf("File path: %s\n", filepath);
-			if(mode == 0){
+			if(strlen(curFile->d_name) > 7 && strcmp((curFile->d_name + (strlen(curFile->d_name) - 3)), "hcz") == 0){
+				printf("Compress file found\n");
+			}else if(mode == 0){
 				//char delimiters[2] = {' ', '\n'};
 				char buffer[100] = {'\0'};
-				fileReading(filepath, buffer, sizeof(buffer), mode);
+				fileReading(filepath, buffer, sizeof(buffer), mode, 0);
+			}else if(mode == 1){
+				char buffer[100] = {'\0'};
+				fileReading(filepath, buffer, sizeof(buffer), mode, strlen(curFile->d_name));
 			}
 			free(filepath);
 		}else if(curFile->d_type == DT_DIR && recursive){
@@ -187,10 +193,6 @@ void directoryTraverse(char* path, int recursive, int mode){
 	free(path);
 	closedir(dirPath);
 }
-void compress(char* huffmancodebook){
-	
-
-}
 char* pathCreator(char* path, char* name){
 	char* newpath = (char *) malloc(sizeof(char) * (strlen(path) + strlen(name) + 2));
 	memcpy(newpath, path, strlen(path));
@@ -204,10 +206,28 @@ char* pathCreator(char* path, char* name){
 	0 -> build
 	1 -> compress
 	2 -> decompress
+	3 -> huffman code processing
 */
-void fileReading(char* path, char* buffer, int bufferSize, int mode){ //Old Template: void fileReading(char* path, char* buffer, char* delimiters, int bufferSize, int delimiterSize);
+void fileReading(char* path, char* buffer, int bufferSize, int mode, int fileNameSize){ //Old Template: void fileReading(char* path, char* buffer, char* delimiters, int bufferSize, int delimiterSize);
 	int fd = open(path, O_RDONLY);
-	if(fd == -1){
+	int fw = -2;
+	char* filename;
+	if(mode == 1){
+		filename = (char*) malloc((strlen(path) + 5) * sizeof(char));
+		memset(filename, '\0', (fileNameSize + 5) * sizeof(char));
+		memcpy(filename, path, strlen(path));
+		strcat(filename, ".hcz");
+		fw = open(filename, O_WRONLY | O_TRUNC | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
+	}
+
+	printf("filename:%s\n", filename);
+	if(fd == -1 || fw == -1){
+		if(fd != -1){
+			close(fd);
+		}
+		if(fw >= 0){
+			close(fw);
+		}
 		printf("Error: File does not exist: should not be possible\n");
 		return;
 	}
@@ -221,7 +241,7 @@ void fileReading(char* path, char* buffer, int bufferSize, int mode){ //Old Temp
 	char* bitstring = NULL;
 	int tabCheck = 0;
 	int escseq = 0;
-	if(mode == 1 || mode == 2){
+	if(mode == 1 || mode == 2 || mode == 3){
 		bitstring = (char*) malloc(sizeof(char) * defaultSize);
 		bitstring = memset(bitstring, '\0', sizeof(char) * defaultSize);
 	}
@@ -242,7 +262,7 @@ void fileReading(char* path, char* buffer, int bufferSize, int mode){ //Old Temp
 					if(itemCount == sizeHT){
 						rehash();
 					}
-					char* whitespaceholder = (char*) malloc(sizeof(char) * (1 + 1)); //One character for the whitespace character and one for terminal character for strings
+					char* whitespaceholder = (char*) malloc(sizeof(char) * (1 + 1));
 					memset(whitespaceholder, '\0', (sizeof(char) * (1 + 1)));
 					memcpy(whitespaceholder, (buffer + bufferPos), sizeof(char));
 				
@@ -257,7 +277,7 @@ void fileReading(char* path, char* buffer, int bufferSize, int mode){ //Old Temp
 					word = (char *)malloc(sizeof(char) * (defaultSize + 1));
 					memset(word, '\0', (sizeof(char) * (defaultSize + 1)));
 
-				}else if(mode == 1){
+				}else if(mode == 3){
 					if(buffer[bufferPos] == '\t'){
 						tabCheck = 1;
 					}else if(buffer[bufferPos] == '\n'){
@@ -273,6 +293,9 @@ void fileReading(char* path, char* buffer, int bufferSize, int mode){ //Old Temp
 							if(itemCount == sizeHT){
 								rehash();
 							}
+							if(strlen(word) == (strlen(escapeseq) + 1) && memcmp(word, escapeseq, strlen(escapeseq)) == 0){
+								word = getWhitespace(word);
+							}
 							insertHT(word, 0, 1, 0, bitstring);
 							tabCheck = 0;
 							
@@ -286,6 +309,16 @@ void fileReading(char* path, char* buffer, int bufferSize, int mode){ //Old Temp
 					}else{
 						printf("Warning: Huffman Codebook not formatted correctly\n");
 					}
+				}else if(mode == 1){
+					findBitstring(word, fw);
+					char* temp = malloc(sizeof(char) * 1);
+					temp[0] = buffer[bufferPos];
+					findBitstring(temp, fw);
+					free(word);
+					free(temp);
+					defaultSize = 20;
+					word = (char *)malloc(sizeof(char) * (defaultSize + 1));
+					memset(word, '\0', (sizeof(char) * (defaultSize + 1)));
 				}
 				
 				defaultSize = 20;
@@ -314,7 +347,8 @@ void fileReading(char* path, char* buffer, int bufferSize, int mode){ //Old Temp
 	if(mode == 0 && word[0] != '\0'){ //Gets the last token if it does not end with a delimiter (treats EOF as delimiter) 
 		insertHT(word, 0, 1, 0, bitstring);
 	}else if(mode == 1 && word[0] != '\0'){
-
+		findBitstring(word, fw);
+		free(word);
 	}else if(mode == 2 && word[0] != '\0'){
 	
 	}else{
@@ -323,7 +357,46 @@ void fileReading(char* path, char* buffer, int bufferSize, int mode){ //Old Temp
 	if(close(fd) < 0){
 		printf("Warning: File Descriptor would not close\n");
 	}
+	if(mode == 1 && close(fw) < 0){
+		printf("Warning: File Descriptor would not close\n");
+	}
 }
+void findBitstring(char* word, int fd){
+	int index = getKey(word, sizeHT);
+	node* curNode = hashT[index];
+	while(curNode != NULL){
+		if(strcmp(curNode->data, word) == 0){
+			writeToFile(curNode->bitstring, strlen(curNode->bitstring), 0, fd);
+			return;
+		}
+		curNode = curNode->next;
+	}
+	printf("Error: Not found in the list of Huffman Codes\n");
+}
+char* getWhitespace(char* word){
+	char letter = word[strlen(word) - 1];
+	char* temp = malloc(sizeof(char) * 2);
+	memset(temp, '\0', (sizeof(char) * 2));
+	switch(letter){
+		case 'n': temp[0] = '\n';
+					break;
+		case 's': temp[0] = ' ';
+					break;
+		case 't': temp[0] = '\t';
+					break;
+		case 'v': temp[0] = '\v';
+					break;
+		case 'f': temp[0] = '\f';
+					break;
+		case 'r': temp[0] = '\r';
+					break;
+		default: printf("ERROR: escape seq detected but not valid whitespace\n");
+					break;
+	}
+	free(word);
+	return temp;
+}
+
 char* doubleStringSize(char* word, int size){
 	char* expanded =  (char*) malloc(sizeof(char) * (size + 1));
 	memset(expanded, '\0', (size+1) * sizeof(char));
@@ -402,7 +475,7 @@ void printHT(){
 	for(i = 0; i < sizeHT; i++){
 	   node* curr = hashT[i];
 		while(curr != NULL){
-				printf("%s with frequency %d\n", curr->data, curr->frequency);
+				printf("%s with frequency %d and bitstring %s\n", curr->data, curr->frequency, curr->bitstring);
             curr = curr->next;
 		}
 	}
