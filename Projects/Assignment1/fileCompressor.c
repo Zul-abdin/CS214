@@ -10,6 +10,7 @@
 
 typedef struct _NODE_{
 	char* data;
+	char* bitstring;
 	struct _NODE_* next;
 	struct _NODE_* prev;
 	int frequency;
@@ -32,7 +33,7 @@ typedef struct _LLNODE_{
 int itemCount = 0;
 int sizeHT = 100;
 node** hashT = NULL;
-
+char* escapeseq = "*^*!&#";
 LLNode* head = NULL;
 
 void directoryTraverse(char* path, int recursive, int mode);
@@ -40,7 +41,7 @@ void bufferFill(int fd, char* buffer, int bytesToRead);
 void fileReading(char* path, char* buffer, int bufferSize, int mode);
 char* pathCreator(char* path, char* name);
 void freeNode(node* node);
-void insertHT(char* word, int whitespace, int frequency, int rehashing);
+void insertHT(char* word, int whitespace, int frequency, int rehashing, char* bitstring);
 void printHT();
 treeNode* createTreeNode(char* data, int frequency, treeNode* left, treeNode* right, int whitespace);
 void initializeLL();
@@ -55,6 +56,9 @@ void freeLLnode(LLNode* node);
 void writeToFile(char* word, int bytesToWrite, int whitespace, int fd);
 void fileWriting(char*);
 char* sequenceReplace(char*);
+void compress(char* huffmancodebook);
+char* doubleStringSize(char* word, int size);
+
 
 int main(int argc, char** argv){
 	if(argc != 4 && argc != 5){
@@ -71,6 +75,14 @@ int main(int argc, char** argv){
 							memcpy(_pathlocation_, argv[3], strlen(argv[3]));
 							_pathlocation_[strlen(argv[3])] = '\0';
 							directoryTraverse(_pathlocation_, 1, 0);
+							printHT();
+							printf("%d\n", itemCount);
+	
+							initializeLL();
+							processLL();
+
+							fileWriting("HuffmanCodebook.txt");
+							freeHT(hashT);
 						}else if(argv[2][1] == 'c' && argc == 5){ //compress recursion
 						
 						}else if(argv[2][1] == 'd' && argc == 5){ //decompress recursion
@@ -93,10 +105,29 @@ int main(int argc, char** argv){
 					memcpy(_pathlocation_, argv[2], strlen(argv[2]));
 					_pathlocation_[strlen(argv[2])] = '\0';
 					directoryTraverse(_pathlocation_, 0, 0);
+					printHT();
+					printf("%d\n", itemCount);
+	
+					initializeLL();
+					processLL();
+
+					fileWriting("HuffmanCodebook.txt");
+					freeHT(hashT);
 			}else if(argv[1][1] == 'c' && argc == 4){ //compress no recursion
-				//decompress algorithm
+				hashT = (node**) calloc(sizeHT, sizeof(node*));
+				char* _pathlocation_ = malloc(sizeof(char) * (strlen(argv[2]) + 1));
+				memcpy(_pathlocation_, argv[2], strlen(argv[2]));
+				_pathlocation_[strlen(argv[2])] = '\0';
+				directoryTraverse(_pathlocation_, 1, 1);
+				
+				
+				char buffer[100] = {'\0'};
+				fileReading(argv[3],buffer,sizeof(buffer),1);
+				printHT();
+				printf("%d\n", itemCount);
+				
 			}else if(argv[1][1] == 'd' && argc == 4){ //decompress no recursion
-				//compress algorithm
+				
 			}else{
 				printf("Fatal Error: Wrong Arguments\n");
 				return 0;
@@ -105,22 +136,14 @@ int main(int argc, char** argv){
 		printf("Fatal Error: Wrong Arguments\n");
 		return 0;
 	}
-	printHT();
-	printf("%d\n", itemCount);
-	
-	initializeLL();
-	processLL();
-	//processTree(head->data, "");
-	fileWriting("HuffmanCodebook.txt");
-	freeHT(hashT);
 	while(head != NULL){
 		LLNode* temp = head;
 		head = head->next;
 		freeLLnode(temp);
 	}
-
 	return 0;
 }
+	
 /*
 	DirectoryTraverse modes:
 	0 = build
@@ -164,7 +187,10 @@ void directoryTraverse(char* path, int recursive, int mode){
 	free(path);
 	closedir(dirPath);
 }
+void compress(char* huffmancodebook){
+	
 
+}
 char* pathCreator(char* path, char* name){
 	char* newpath = (char *) malloc(sizeof(char) * (strlen(path) + strlen(name) + 2));
 	memcpy(newpath, path, strlen(path));
@@ -192,8 +218,15 @@ void fileReading(char* path, char* buffer, int bufferSize, int mode){ //Old Temp
 	char* word = (char*) malloc(sizeof(char) * defaultSize);
 	word = memset(word, '\0', sizeof(char) * defaultSize);
 	int wordpos = 0;
+	char* bitstring = NULL;
+	int tabCheck = 0;
+	int escseq = 0;
+	if(mode == 1 || mode == 2){
+		bitstring = (char*) malloc(sizeof(char) * defaultSize);
+		bitstring = memset(bitstring, '\0', sizeof(char) * defaultSize);
+	}
 	
-	while(buffer[0] != '\0'){
+	while(buffer[0] != '\0'){	
 		for(bufferPos = 0; bufferPos < (bufferSize/sizeof(buffer[0])); ++bufferPos){
 			/*int delimiterPos;
 			int isDelimiter = 0;
@@ -206,41 +239,80 @@ void fileReading(char* path, char* buffer, int bufferSize, int mode){ //Old Temp
 			*/
 			if(isspace(buffer[bufferPos])){
 				if(mode == 0){
+					if(itemCount == sizeHT){
+						rehash();
+					}
 					char* whitespaceholder = (char*) malloc(sizeof(char) * (1 + 1)); //One character for the whitespace character and one for terminal character for strings
 					memset(whitespaceholder, '\0', (sizeof(char) * (1 + 1)));
 					memcpy(whitespaceholder, (buffer + bufferPos), sizeof(char));
 				
-					insertHT(whitespaceholder, 1, 1, 0);
-					insertHT(word, 0, 1, 0);
-					if(itemCount == sizeHT){
-						rehash();
+					insertHT(whitespaceholder, 1, 1, 0, bitstring);
+					if(word[0] != '\0'){
+						insertHT(word, 0, 1, 0, bitstring);
+					}else{
+						free(word);
+					}
+					
+					defaultSize = 20;
+					word = (char *)malloc(sizeof(char) * (defaultSize + 1));
+					memset(word, '\0', (sizeof(char) * (defaultSize + 1)));
+
+				}else if(mode == 1){
+					if(buffer[bufferPos] == '\t'){
+						tabCheck = 1;
+					}else if(buffer[bufferPos] == '\n'){
+						if(escseq == 0){
+							escseq = 1;
+							escapeseq = word;
+							
+							defaultSize = 20;
+							word = (char *)malloc(sizeof(char) * (defaultSize + 1));
+							memset(word, '\0', (sizeof(char) * (defaultSize + 1)));
+							
+						}else{
+							if(itemCount == sizeHT){
+								rehash();
+							}
+							insertHT(word, 0, 1, 0, bitstring);
+							tabCheck = 0;
+							
+							defaultSize = 20;
+							word = (char *)malloc(sizeof(char) * (defaultSize + 1));
+							memset(word, '\0', (sizeof(char) * (defaultSize + 1)));
+							bitstring = (char*) malloc(sizeof(char) * (defaultSize + 1));
+							memset(bitstring, '\0', (sizeof(char) * (defaultSize + 1)));
+						}
+						
+					}else{
+						printf("Warning: Huffman Codebook not formatted correctly\n");
 					}
 				}
 				
-				
 				defaultSize = 20;
 				wordpos = 0;
-				word = (char *)malloc(sizeof(char) * (defaultSize + 1));
-				memset(word, '\0', (sizeof(char) * (defaultSize + 1)));
 				
 			}else{
 				if(wordpos >= defaultSize){
-				  	defaultSize = defaultSize * 2;
-				  	char* expanded =  (char*) malloc(sizeof(char) * (defaultSize + 1));
-				  	memset(expanded, '\0', (defaultSize+1) * sizeof(char));
-				  	memcpy(expanded, word, strlen(word));
-				  	free(word);
-				  	word = expanded;
+					if(tabCheck){
+						defaultSize = defaultSize * 2;
+					  	bitstring = doubleStringSize(bitstring, defaultSize);
+					}else{
+					  	defaultSize = defaultSize * 2;
+					  	word = doubleStringSize(word, defaultSize);
+				  	}
+		  	  	}
+		  	  	if(tabCheck){
+		  	  		bitstring[wordpos] = buffer[bufferPos];
 		  	  	}else{
 		  	  		word[wordpos] = buffer[bufferPos];
-		  	  		wordpos++;
 		  	  	}
+		  	  	wordpos++;
 			}
 		}
 		bufferFill(fd, buffer, bufferSize);	
 	}
 	if(mode == 0 && word[0] != '\0'){ //Gets the last token if it does not end with a delimiter (treats EOF as delimiter) 
-		insertHT(word, 0, 1, 0);
+		insertHT(word, 0, 1, 0, bitstring);
 	}else if(mode == 1 && word[0] != '\0'){
 
 	}else if(mode == 2 && word[0] != '\0'){
@@ -251,6 +323,13 @@ void fileReading(char* path, char* buffer, int bufferSize, int mode){ //Old Temp
 	if(close(fd) < 0){
 		printf("Warning: File Descriptor would not close\n");
 	}
+}
+char* doubleStringSize(char* word, int size){
+	char* expanded =  (char*) malloc(sizeof(char) * (size + 1));
+	memset(expanded, '\0', (size+1) * sizeof(char));
+	memcpy(expanded, word, strlen(word));
+	free(word);
+	return expanded;
 }
 
 int getKey(char* word, int size){
@@ -277,7 +356,7 @@ void rehash(){
 	for(i = 0; i < (sizeHT/2); ++i){
 		node* curNode = oldHead[i];
 		while(curNode != NULL){
-			insertHT(curNode->data, curNode->whitespace, curNode->frequency, 1);
+			insertHT(curNode->data, curNode->whitespace, curNode->frequency, 1, curNode->bitstring);
 			node* temp = curNode;
 			curNode = curNode->next;
 			free(temp);
@@ -286,7 +365,7 @@ void rehash(){
 	free(oldHead);
 }
 
-void insertHT(char* word, int whitespace, int frequency, int rehashing){
+void insertHT(char* word, int whitespace, int frequency, int rehashing, char* bitstring){
 	int index = getKey(word, sizeHT);
 	node* newNode = (node *)malloc(sizeof(node) * 1);
 	newNode->data = word;
@@ -295,6 +374,7 @@ void insertHT(char* word, int whitespace, int frequency, int rehashing){
 	newNode->prev = NULL;
 	newNode->frequency = frequency;
 	newNode->whitespace = whitespace;
+	newNode->bitstring = bitstring;
 	if(hashT[index] != NULL){
 		node* curNode = hashT[index];
 		node* prevNode = curNode;
@@ -339,7 +419,6 @@ void freeHT(node** head){
 	}
 	free(head);
 }
-
 void freeNode(node* curNode){
 	free(curNode->data);
 	free(curNode);
@@ -460,7 +539,7 @@ char* sequenceReplace(char* word){
 }
 void fileWriting(char* filename){
 	int fd = open(filename, O_WRONLY | O_TRUNC | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
-	writeToFile("ESCAPESEQ", strlen("ESCAPESEQ"), 0, fd);
+	writeToFile(escapeseq, strlen(escapeseq), 0, fd);
 	writeToFile("\n", strlen("\n"), 0, fd);
 	processTree(head->data, "", fd);
 	close(fd);
@@ -469,7 +548,7 @@ void writeToFile(char* word, int bytesToWrite, int whitespace, int fd){
 	int bytesWritten = 0;
 	int status = 0;
 	if(whitespace){ //This case: bytesToWrite should be 1 so we do not need to change it when we turn whitespace to its counterpart
-		writeToFile("ESCAPESEQ", strlen("ESCAPESEQ"), 0, fd);
+		writeToFile(escapeseq, strlen(escapeseq), 0, fd);
 		word = sequenceReplace(word); 
 	}
 	while(bytesWritten < bytesToWrite){
