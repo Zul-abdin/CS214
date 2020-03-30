@@ -83,9 +83,19 @@ int main(int argc, char** argv){
 							processLL();
 
 							fileWriting("HuffmanCodebook.txt");
-							freeHT(hashT);
 						}else if(argv[2][1] == 'c' && argc == 5){ //compress recursion
-						
+							hashT = (node**) calloc(sizeHT, sizeof(node*));				
+				
+							char buffer[100] = {'\0'};
+							fileReading(argv[4],buffer,sizeof(buffer), 3, 0);
+							printHT();
+							printf("%d\n", itemCount);
+				
+							char* _pathlocation_ = malloc(sizeof(char) * (strlen(argv[3]) + 1));
+							memcpy(_pathlocation_, argv[3], strlen(argv[3]));
+							_pathlocation_[strlen(argv[3])] = '\0';
+							directoryTraverse(_pathlocation_, 1, 1);
+							
 						}else if(argv[2][1] == 'd' && argc == 5){ //decompress recursion
 							
 						}else{
@@ -113,7 +123,7 @@ int main(int argc, char** argv){
 					processLL();
 
 					fileWriting("HuffmanCodebook.txt");
-					freeHT(hashT);
+
 			}else if(argv[1][1] == 'c' && argc == 4){ //compress no recursion
 				hashT = (node**) calloc(sizeHT, sizeof(node*));				
 				
@@ -137,6 +147,7 @@ int main(int argc, char** argv){
 		printf("Fatal Error: Wrong Arguments\n");
 		return 0;
 	}
+	freeHT(hashT);
 	while(head != NULL){
 		LLNode* temp = head;
 		head = head->next;
