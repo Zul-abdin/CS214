@@ -38,7 +38,7 @@ LLNode* head = NULL;
 
 void directoryTraverse(char* path, int recursive, int mode);
 void bufferFill(int fd, char* buffer, int bytesToRead);
-void fileReading(char* path, char* buffer, int bufferSize, int mode, int);
+void fileReading(char* path, char* buffer, int bufferSize, int mode);
 char* pathCreator(char* path, char* name);
 void freeNode(node* node);
 void insertHT(char* word, int whitespace, int frequency, int rehashing, char* bitstring);
@@ -59,7 +59,7 @@ char* sequenceReplace(char*);
 void compress(char* huffmancodebook);
 char* doubleStringSize(char* word, int size);
 char* getWhitespace(char*);
-void findBitstring(char* word, int fd);
+int findBitstring(char* word, int fd);
 
 int main(int argc, char** argv){
 	if(argc != 4 && argc != 5){
@@ -87,7 +87,7 @@ int main(int argc, char** argv){
 							hashT = (node**) calloc(sizeHT, sizeof(node*));				
 				
 							char buffer[100] = {'\0'};
-							fileReading(argv[4],buffer,sizeof(buffer), 3, 0);
+							fileReading(argv[4],buffer,sizeof(buffer), 3);
 							printHT();
 							printf("%d\n", itemCount);
 				
@@ -97,7 +97,16 @@ int main(int argc, char** argv){
 							directoryTraverse(_pathlocation_, 1, 1);
 							
 						}else if(argv[2][1] == 'd' && argc == 5){ //decompress recursion
+							hashT = (node**) calloc(sizeHT, sizeof(node*));	
+							char buffer[100] = {'\0'};
+							fileReading(argv[4],buffer,sizeof(buffer), 4);
+							printHT();
+							printf("%d\n", itemCount);
 							
+							char* _pathlocation_ = malloc(sizeof(char) * (strlen(argv[3]) + 1));
+							memcpy(_pathlocation_, argv[3], strlen(argv[3]));
+							_pathlocation_[strlen(argv[3])] = '\0';
+							directoryTraverse(_pathlocation_, 1, 2);
 						}else{
 							printf("Fatal Error: Wrong Arguments\n");
 							return 0;
@@ -128,7 +137,7 @@ int main(int argc, char** argv){
 				hashT = (node**) calloc(sizeHT, sizeof(node*));				
 				
 				char buffer[100] = {'\0'};
-				fileReading(argv[3],buffer,sizeof(buffer), 3, 0);
+				fileReading(argv[3],buffer,sizeof(buffer), 3);
 				printHT();
 				printf("%d\n", itemCount);
 				
@@ -138,6 +147,16 @@ int main(int argc, char** argv){
 				directoryTraverse(_pathlocation_, 0, 1);
 				
 			}else if(argv[1][1] == 'd' && argc == 4){ //decompress no recursion
+				hashT = (node**) calloc(sizeHT, sizeof(node*));	
+				char buffer[100] = {'\0'};
+				fileReading(argv[3],buffer,sizeof(buffer), 4);
+				printHT();
+				printf("%d\n", itemCount);
+				
+				char* _pathlocation_ = malloc(sizeof(char) * (strlen(argv[2]) + 1));
+				memcpy(_pathlocation_, argv[2], strlen(argv[2]));
+				_pathlocation_[strlen(argv[2])] = '\0';
+				directoryTraverse(_pathlocation_, 0, 2);
 				
 			}else{
 				printf("Fatal Error: Wrong Arguments\n");
@@ -180,15 +199,23 @@ void directoryTraverse(char* path, int recursive, int mode){
 			printf("File Found: %s\n", curFile->d_name);
 			char* filepath = pathCreator(path, curFile->d_name);
 			printf("File path: %s\n", filepath);
+			int compressFile = 0;
 			if(strlen(curFile->d_name) > 7 && strcmp((curFile->d_name + (strlen(curFile->d_name) - 3)), "hcz") == 0){
 				printf("Compress file found\n");
-			}else if(mode == 0){
-				//char delimiters[2] = {' ', '\n'};
+				compressFile = 1;
+			}
+			if(mode == 0 && compressFile == 0){
+				printf("Building the HufmanCodebook\n");
 				char buffer[100] = {'\0'};
-				fileReading(filepath, buffer, sizeof(buffer), mode, 0);
-			}else if(mode == 1){
+				fileReading(filepath, buffer, sizeof(buffer), mode);
+			}else if(mode == 1 && compressFile == 0){
+				printf("Compressing the file\n");
 				char buffer[100] = {'\0'};
-				fileReading(filepath, buffer, sizeof(buffer), mode, strlen(curFile->d_name));
+				fileReading(filepath, buffer, sizeof(buffer), mode);
+			}else if(mode == 2 && compressFile){\
+				printf("Decompressing the file\n");
+				char buffer[100] = {'\0'};
+				fileReading(filepath, buffer, sizeof(buffer), mode);
 			}
 			free(filepath);
 		}else if(curFile->d_type == DT_DIR && recursive){
@@ -217,17 +244,23 @@ char* pathCreator(char* path, char* name){
 	0 -> build
 	1 -> compress
 	2 -> decompress
-	3 -> huffman code processing
+	3 -> compression huffman code processing (hashtable is sorted by word)
+	4 -> decompression huffman code processing (hashtable is sorted by bitstring)
 */
-void fileReading(char* path, char* buffer, int bufferSize, int mode, int fileNameSize){ //Old Template: void fileReading(char* path, char* buffer, char* delimiters, int bufferSize, int delimiterSize);
+void fileReading(char* path, char* buffer, int bufferSize, int mode){ //Old Template: void fileReading(char* path, char* buffer, char* delimiters, int bufferSize, int delimiterSize);
 	int fd = open(path, O_RDONLY);
 	int fw = -2;
-	char* filename;
+	char* filename = NULL;
 	if(mode == 1){
 		filename = (char*) malloc((strlen(path) + 5) * sizeof(char));
-		memset(filename, '\0', (fileNameSize + 5) * sizeof(char));
+		memset(filename, '\0', (strlen(path) + 5) * sizeof(char));
 		memcpy(filename, path, strlen(path));
 		strcat(filename, ".hcz");
+		fw = open(filename, O_WRONLY | O_TRUNC | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
+	}else if(mode == 2){
+		filename = (char*) malloc((strlen(path)- 3) * sizeof(char));
+		memset(filename, '\0', (strlen(path) - 3) * sizeof(char));
+		memcpy(filename, path, strlen(path) - 4);
 		fw = open(filename, O_WRONLY | O_TRUNC | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
 	}
 
@@ -252,105 +285,120 @@ void fileReading(char* path, char* buffer, int bufferSize, int mode, int fileNam
 	char* bitstring = NULL;
 	int tabCheck = 0;
 	int escseq = 0;
-	if(mode == 1 || mode == 2 || mode == 3){
+	if(mode == 3 || mode == 4){
 		bitstring = (char*) malloc(sizeof(char) * defaultSize);
 		bitstring = memset(bitstring, '\0', sizeof(char) * defaultSize);
 	}
 	
 	while(buffer[0] != '\0'){	
 		for(bufferPos = 0; bufferPos < (bufferSize/sizeof(buffer[0])); ++bufferPos){
-			/*int delimiterPos;
-			int isDelimiter = 0;
-			for(delimiterPos = 0; delimiterPos < (delimiterSize/sizeof(delimiters[0])); ++delimiterPos){
-				if(buffer[bufferPos] == delimiters[delimiterPos]){
-					isDelimiter = 1;
-					break;
-				}
-			}
-			*/
-			if(isspace(buffer[bufferPos])){
-				if(mode == 0){
-					if(itemCount == sizeHT){
-						rehash();
+			if(mode == 2){
+				if(buffer[bufferPos] == '\n'){
+					printf("Last token processed\n");
+				}else{
+					if(wordpos >= defaultSize){
+						defaultSize = defaultSize * 2;
+						word = doubleStringSize(word, defaultSize);
 					}
-					char* whitespaceholder = (char*) malloc(sizeof(char) * (1 + 1));
-					memset(whitespaceholder, '\0', (sizeof(char) * (1 + 1)));
-					memcpy(whitespaceholder, (buffer + bufferPos), sizeof(char));
-				
-					insertHT(whitespaceholder, 1, 1, 0, bitstring);
-					if(word[0] != '\0'){
-						insertHT(word, 0, 1, 0, bitstring);
-					}else{
+					word[wordpos] = buffer[bufferPos];
+					wordpos++;
+					if(findBitstring(word, fw) == 1){
+						wordpos = 0;
 						free(word);
+						defaultSize = 20;
+						word = (char *)malloc(sizeof(char) * (defaultSize + 1));
+						memset(word, '\0', (sizeof(char) * (defaultSize + 1)));
+					}
+				}
+			}else {
+				if(isspace(buffer[bufferPos])){
+					if(mode == 0){
+						if(itemCount == sizeHT){
+							rehash();
+						}
+						char* whitespaceholder = (char*) malloc(sizeof(char) * (1 + 1));
+						memset(whitespaceholder, '\0', (sizeof(char) * (1 + 1)));
+						memcpy(whitespaceholder, (buffer + bufferPos), sizeof(char));
+					
+						insertHT(whitespaceholder, 1, 1, 0, bitstring);
+						if(word[0] != '\0'){
+							insertHT(word, 0, 1, 0, bitstring);
+						}else{
+							free(word);
+						}
+						
+						defaultSize = 20;
+						word = (char *)malloc(sizeof(char) * (defaultSize + 1));
+						memset(word, '\0', (sizeof(char) * (defaultSize + 1)));
+
+					}else if(mode == 3 || mode == 4){
+						if(buffer[bufferPos] == '\t'){
+							tabCheck = 1;
+						}else if(buffer[bufferPos] == '\n'){
+							if(escseq == 0){
+								escseq = 1;
+								escapeseq = word;
+								
+								defaultSize = 20;
+								word = (char *)malloc(sizeof(char) * (defaultSize + 1));
+								memset(word, '\0', (sizeof(char) * (defaultSize + 1)));
+								
+							}else{
+								if(itemCount == sizeHT){
+									rehash();
+								}
+								if(strlen(word) == (strlen(escapeseq) + 1) && memcmp(word, escapeseq, strlen(escapeseq)) == 0){
+									word = getWhitespace(word);
+								}
+								if(mode == 4){
+									insertHT(bitstring, 0, 1, 0, word);
+								}else{
+									insertHT(word, 0, 1, 0, bitstring);
+								}
+								tabCheck = 0;
+								
+								defaultSize = 20;
+								word = (char *)malloc(sizeof(char) * (defaultSize + 1));
+								memset(word, '\0', (sizeof(char) * (defaultSize + 1)));
+								bitstring = (char*) malloc(sizeof(char) * (defaultSize + 1));
+								memset(bitstring, '\0', (sizeof(char) * (defaultSize + 1)));
+							}
+							
+						}else{
+							printf("Warning: Huffman Codebook not formatted correctly\n");
+						}
+					}else if(mode == 1){
+						findBitstring(word, fw);
+						char* temp = malloc(sizeof(char) * 1);
+						temp[0] = buffer[bufferPos];
+						findBitstring(temp, fw);
+						free(word);
+						free(temp);
+						defaultSize = 20;
+						word = (char *)malloc(sizeof(char) * (defaultSize + 1));
+						memset(word, '\0', (sizeof(char) * (defaultSize + 1)));
 					}
 					
 					defaultSize = 20;
-					word = (char *)malloc(sizeof(char) * (defaultSize + 1));
-					memset(word, '\0', (sizeof(char) * (defaultSize + 1)));
-
-				}else if(mode == 3){
-					if(buffer[bufferPos] == '\t'){
-						tabCheck = 1;
-					}else if(buffer[bufferPos] == '\n'){
-						if(escseq == 0){
-							escseq = 1;
-							escapeseq = word;
-							
-							defaultSize = 20;
-							word = (char *)malloc(sizeof(char) * (defaultSize + 1));
-							memset(word, '\0', (sizeof(char) * (defaultSize + 1)));
-							
+					wordpos = 0;
+					
+				}else{
+					if(wordpos >= defaultSize){
+						if(tabCheck){
+							defaultSize = defaultSize * 2;
+						  	bitstring = doubleStringSize(bitstring, defaultSize);
 						}else{
-							if(itemCount == sizeHT){
-								rehash();
-							}
-							if(strlen(word) == (strlen(escapeseq) + 1) && memcmp(word, escapeseq, strlen(escapeseq)) == 0){
-								word = getWhitespace(word);
-							}
-							insertHT(word, 0, 1, 0, bitstring);
-							tabCheck = 0;
-							
-							defaultSize = 20;
-							word = (char *)malloc(sizeof(char) * (defaultSize + 1));
-							memset(word, '\0', (sizeof(char) * (defaultSize + 1)));
-							bitstring = (char*) malloc(sizeof(char) * (defaultSize + 1));
-							memset(bitstring, '\0', (sizeof(char) * (defaultSize + 1)));
-						}
-						
-					}else{
-						printf("Warning: Huffman Codebook not formatted correctly\n");
-					}
-				}else if(mode == 1){
-					findBitstring(word, fw);
-					char* temp = malloc(sizeof(char) * 1);
-					temp[0] = buffer[bufferPos];
-					findBitstring(temp, fw);
-					free(word);
-					free(temp);
-					defaultSize = 20;
-					word = (char *)malloc(sizeof(char) * (defaultSize + 1));
-					memset(word, '\0', (sizeof(char) * (defaultSize + 1)));
+						  	defaultSize = defaultSize * 2;
+						  	word = doubleStringSize(word, defaultSize);
+					  	}
+			  	  	}
+			  	  	if(tabCheck){
+			  	  		bitstring[wordpos] = buffer[bufferPos];
+			  	  	}else{
+			  	  		word[wordpos] = buffer[bufferPos];
+			  	  	}
+			  	  	wordpos++;
 				}
-				
-				defaultSize = 20;
-				wordpos = 0;
-				
-			}else{
-				if(wordpos >= defaultSize){
-					if(tabCheck){
-						defaultSize = defaultSize * 2;
-					  	bitstring = doubleStringSize(bitstring, defaultSize);
-					}else{
-					  	defaultSize = defaultSize * 2;
-					  	word = doubleStringSize(word, defaultSize);
-				  	}
-		  	  	}
-		  	  	if(tabCheck){
-		  	  		bitstring[wordpos] = buffer[bufferPos];
-		  	  	}else{
-		  	  		word[wordpos] = buffer[bufferPos];
-		  	  	}
-		  	  	wordpos++;
 			}
 		}
 		bufferFill(fd, buffer, bufferSize);	
@@ -361,7 +409,8 @@ void fileReading(char* path, char* buffer, int bufferSize, int mode, int fileNam
 		findBitstring(word, fw);
 		free(word);
 	}else if(mode == 2 && word[0] != '\0'){
-	
+		printf("Error: Compress File formatted improperly\n");
+		free(word);
 	}else{
 		free(word);
 	}
@@ -372,17 +421,18 @@ void fileReading(char* path, char* buffer, int bufferSize, int mode, int fileNam
 		printf("Warning: File Descriptor would not close\n");
 	}
 }
-void findBitstring(char* word, int fd){
+int findBitstring(char* word, int fd){
 	int index = getKey(word, sizeHT);
 	node* curNode = hashT[index];
 	while(curNode != NULL){
 		if(strcmp(curNode->data, word) == 0){
 			writeToFile(curNode->bitstring, strlen(curNode->bitstring), 0, fd);
-			return;
+			return 1;
 		}
 		curNode = curNode->next;
 	}
-	printf("Error: Not found in the list of Huffman Codes\n");
+	return -1;
+	printf("Not found in the list of Huffman Codes\n");
 }
 char* getWhitespace(char* word){
 	char letter = word[strlen(word) - 1];
