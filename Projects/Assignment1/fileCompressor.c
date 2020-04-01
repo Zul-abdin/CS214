@@ -60,6 +60,9 @@ void compress(char* huffmancodebook);
 char* doubleStringSize(char* word, int size);
 char* getWhitespace(char*);
 int findBitstring(char* word, int fd);
+char generatingchar();
+void generateEscapeSeq();
+int searchHT(char* word);
 
 int main(int argc, char** argv){
 	if(argc < 3 && argc > 5){
@@ -72,15 +75,15 @@ int main(int argc, char** argv){
 					if(argv[2][0] == '-'){
 						if(argv[2][1] == 'b' && argc == 4){ //build recursion
 							hashT = (node**) calloc(sizeHT, sizeof(node*));
-							escapeseq = (char*) malloc(sizeof(char) * 7);
-							memcpy(escapeseq, "*^*!&#", strlen("*^*!&#"));
 							char* _pathlocation_ = malloc(sizeof(char) * (strlen(argv[3]) + 1));
 							memcpy(_pathlocation_, argv[3], strlen(argv[3]));
 							_pathlocation_[strlen(argv[3])] = '\0';
 							directoryTraverse(_pathlocation_, 1, 0);
 							printHT();
 							printf("%d\n", itemCount);
+
 							if(invalidDirectory == 0){
+								generateEscapeSeq();
 								initializeLL();
 								processLL();
 
@@ -101,7 +104,7 @@ int main(int argc, char** argv){
 							}
 							
 							
-						}else if(argv[2][1] == 'd' && argc == 5){ //decomprsess recursion
+						}else if(argv[2][1] == 'd' && argc == 5){ //decompress recursion
 							hashT = (node**) calloc(sizeHT, sizeof(node*));	
 							char buffer[100] = {'\0'};
 							fileReading(argv[4],buffer,sizeof(buffer), 4);
@@ -129,8 +132,6 @@ int main(int argc, char** argv){
 					return 0;
 				}
 			}else if(argv[1][1] == 'b' && argc == 3){ //build mode no recursion
-					escapeseq = (char*) malloc(sizeof(char) * 7);
-					memcpy(escapeseq, "*^*!&#", strlen("*^*!&#"));
 					hashT = (node**) calloc(sizeHT, sizeof(node*));
 					char* _pathlocation_ = malloc(sizeof(char) * (strlen(argv[2]) + 1));
 					memcpy(_pathlocation_, argv[2], strlen(argv[2]));
@@ -139,6 +140,7 @@ int main(int argc, char** argv){
 					printHT();
 					printf("%d\n", itemCount);
 					if(invalidDirectory == 0){
+						generateEscapeSeq();
 						printf("Writing to file\n");
 						initializeLL();
 						processLL();
@@ -189,7 +191,9 @@ int main(int argc, char** argv){
 		head = head->next;
 		freeLLnode(temp);
 	}
-	free(escapeseq);
+	if(escapeseq != NULL){
+		free(escapeseq);
+	}
 	return 0;
 }
 	
@@ -359,7 +363,7 @@ void fileReading(char* path, char* buffer, int bufferSize, int mode){ //Old Temp
 						if(buffer[bufferPos] == '\t'){
 							tabCheck = 1;
 						}else if(buffer[bufferPos] == '\n'){
-							if(escseq == 0){
+							if(escseq == 0 && tabCheck == 0){
 								escseq = 1;
 								escapeseq = bitstring;
 								
@@ -448,6 +452,53 @@ void fileReading(char* path, char* buffer, int bufferSize, int mode){ //Old Temp
 		printf("Warning: File Descriptor would not close\n");
 	}
 }
+void generateEscapeSeq(){
+	int validEscapeSeq = 0;
+	int defaultSize = 2;
+	do{
+		char* oldseq = escapeseq;
+		escapeseq = (char*) malloc(sizeof(char) * defaultSize);
+		memset(escapeseq, '\0', (sizeof(char) * defaultSize));
+		if(oldseq != NULL){
+			memcpy(escapeseq, oldseq, strlen(oldseq) * sizeof(char));
+			free(oldseq);
+		}
+		char temp = generatingchar();
+		escapeseq[defaultSize - 2] = temp;
+		defaultSize = defaultSize + 1;
+		if(searchHT(escapeseq) == -1){
+			validEscapeSeq = 1;
+		}
+	}while(validEscapeSeq == 0);
+}
+
+int searchHT(char* word){
+	int index = getKey(word, sizeHT);
+	if(hashT[index] != NULL){
+		node* curNode = hashT[index];
+		while(curNode != NULL){
+			if(strcmp(curNode->data, word) == 0){
+				return 1;
+			}
+			curNode = curNode->next;
+		}
+	}
+	return -1;
+}
+
+char generatingchar(){
+	int r = rand() % 6;
+	switch(r){
+		case 0: return '$';
+		case 1: return '&';
+		case 2: return '*';
+		case 3: return '#';
+		case 4: return '!';
+		case 5: return '~';
+		default: return '_';
+	}
+}
+
 int findBitstring(char* word, int fd){
 	int index = getKey(word, sizeHT);
 	node* curNode = hashT[index];
