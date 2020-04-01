@@ -63,6 +63,7 @@ int findBitstring(char* word, int fd);
 char generatingchar();
 void generateEscapeSeq();
 int searchHT(char* word);
+int sequenceChecker(char* word, int wordlength);
 
 int main(int argc, char** argv){
 	if(argc < 3 && argc > 5){
@@ -457,8 +458,8 @@ void generateEscapeSeq(){
 	int defaultSize = 2;
 	do{
 		char* oldseq = escapeseq;
-		escapeseq = (char*) malloc(sizeof(char) * defaultSize);
-		memset(escapeseq, '\0', (sizeof(char) * defaultSize));
+		escapeseq = (char*) malloc(sizeof(char) * defaultSize + 1);
+		memset(escapeseq, '\0', (sizeof(char) * defaultSize + 1));
 		if(oldseq != NULL){
 			memcpy(escapeseq, oldseq, strlen(oldseq) * sizeof(char));
 			free(oldseq);
@@ -466,12 +467,28 @@ void generateEscapeSeq(){
 		char temp = generatingchar();
 		escapeseq[defaultSize - 2] = temp;
 		defaultSize = defaultSize + 1;
-		if(searchHT(escapeseq) == -1){
+		if(sequenceChecker(escapeseq, defaultSize) == -1){
 			validEscapeSeq = 1;
 		}
 	}while(validEscapeSeq == 0);
 }
 
+int sequenceChecker(char* word, int wordlength){
+	if(searchHT(word) == 1){
+		return 1;
+	}
+	int i;
+	char ws[] = {'n','s','t','v','f','r'};
+	for(i = 0; i < 6; ++i){
+		word[wordlength - 2] = ws[i];
+		if(searchHT(word) == 1){
+			word[wordlength - 2] = '\0';
+			return 1;
+		}
+	}
+	word[wordlength - 2] = '\0';
+	return -1;
+}
 int searchHT(char* word){
 	int index = getKey(word, sizeHT);
 	if(hashT[index] != NULL){
