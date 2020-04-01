@@ -33,9 +33,9 @@ typedef struct _LLNODE_{
 int itemCount = 0;
 int sizeHT = 100;
 node** hashT = NULL;
-char* escapeseq = "*^*!&#";
+char* escapeseq = NULL;
 LLNode* head = NULL;
-
+int invalidDirectory = 0;
 void directoryTraverse(char* path, int recursive, int mode);
 void bufferFill(int fd, char* buffer, int bytesToRead);
 void fileReading(char* path, char* buffer, int bufferSize, int mode);
@@ -62,7 +62,7 @@ char* getWhitespace(char*);
 int findBitstring(char* word, int fd);
 
 int main(int argc, char** argv){
-	if(argc != 4 && argc != 5){
+	if(argc < 3 && argc > 5){
 		printf("Fatal Error: too many or too few arguments\n");
 		return 0;
 	}
@@ -72,17 +72,20 @@ int main(int argc, char** argv){
 					if(argv[2][0] == '-'){
 						if(argv[2][1] == 'b' && argc == 4){ //build recursion
 							hashT = (node**) calloc(sizeHT, sizeof(node*));
+							escapeseq = (char*) malloc(sizeof(char) * 7);
+							memcpy(escapeseq, "*^*!&#", strlen("*^*!&#"));
 							char* _pathlocation_ = malloc(sizeof(char) * (strlen(argv[3]) + 1));
 							memcpy(_pathlocation_, argv[3], strlen(argv[3]));
 							_pathlocation_[strlen(argv[3])] = '\0';
 							directoryTraverse(_pathlocation_, 1, 0);
 							printHT();
 							printf("%d\n", itemCount);
-	
-							initializeLL();
-							processLL();
+							if(invalidDirectory == 0){
+								initializeLL();
+								processLL();
 
-							fileWriting("HuffmanCodebook.txt");
+								fileWriting("HuffmanCodebook.txt");
+							}
 						}else if(argv[2][1] == 'c' && argc == 5){ //compress recursion
 							hashT = (node**) calloc(sizeHT, sizeof(node*));				
 				
@@ -90,23 +93,29 @@ int main(int argc, char** argv){
 							fileReading(argv[4],buffer,sizeof(buffer), 3);
 							printHT();
 							printf("%d\n", itemCount);
-				
-							char* _pathlocation_ = malloc(sizeof(char) * (strlen(argv[3]) + 1));
-							memcpy(_pathlocation_, argv[3], strlen(argv[3]));
-							_pathlocation_[strlen(argv[3])] = '\0';
-							directoryTraverse(_pathlocation_, 1, 1);
+							if(invalidDirectory == 0){
+								char* _pathlocation_ = malloc(sizeof(char) * (strlen(argv[3]) + 1));
+								memcpy(_pathlocation_, argv[3], strlen(argv[3]));
+								_pathlocation_[strlen(argv[3])] = '\0';
+								directoryTraverse(_pathlocation_, 1, 1);
+							}
 							
-						}else if(argv[2][1] == 'd' && argc == 5){ //decompress recursion
+							
+						}else if(argv[2][1] == 'd' && argc == 5){ //decomprsess recursion
 							hashT = (node**) calloc(sizeHT, sizeof(node*));	
 							char buffer[100] = {'\0'};
 							fileReading(argv[4],buffer,sizeof(buffer), 4);
 							printHT();
 							printf("%d\n", itemCount);
 							
-							char* _pathlocation_ = malloc(sizeof(char) * (strlen(argv[3]) + 1));
-							memcpy(_pathlocation_, argv[3], strlen(argv[3]));
-							_pathlocation_[strlen(argv[3])] = '\0';
-							directoryTraverse(_pathlocation_, 1, 2);
+							if(invalidDirectory == 0){
+								char* _pathlocation_ = malloc(sizeof(char) * (strlen(argv[3]) + 1));
+								memcpy(_pathlocation_, argv[3], strlen(argv[3]));
+								_pathlocation_[strlen(argv[3])] = '\0';
+								directoryTraverse(_pathlocation_, 1, 2);
+							}
+							
+							
 						}else{
 							printf("Fatal Error: Wrong Arguments\n");
 							return 0;
@@ -119,7 +128,9 @@ int main(int argc, char** argv){
 					printf("Fatal Error: Wrong Arguments\n");
 					return 0;
 				}
-			}else if(argv[1][1] == 'b' && argc == 4){ //build mode no recursion
+			}else if(argv[1][1] == 'b' && argc == 3){ //build mode no recursion
+					escapeseq = (char*) malloc(sizeof(char) * 7);
+					memcpy(escapeseq, "*^*!&#", strlen("*^*!&#"));
 					hashT = (node**) calloc(sizeHT, sizeof(node*));
 					char* _pathlocation_ = malloc(sizeof(char) * (strlen(argv[2]) + 1));
 					memcpy(_pathlocation_, argv[2], strlen(argv[2]));
@@ -127,11 +138,13 @@ int main(int argc, char** argv){
 					directoryTraverse(_pathlocation_, 0, 0);
 					printHT();
 					printf("%d\n", itemCount);
-	
-					initializeLL();
-					processLL();
+					if(invalidDirectory == 0){
+						printf("Writing to file\n");
+						initializeLL();
+						processLL();
 
-					fileWriting("HuffmanCodebook.txt");
+						fileWriting("HuffmanCodebook.txt");
+					}
 
 			}else if(argv[1][1] == 'c' && argc == 4){ //compress no recursion
 				hashT = (node**) calloc(sizeHT, sizeof(node*));				
@@ -141,10 +154,12 @@ int main(int argc, char** argv){
 				printHT();
 				printf("%d\n", itemCount);
 				
-				char* _pathlocation_ = malloc(sizeof(char) * (strlen(argv[2]) + 1));
-				memcpy(_pathlocation_, argv[2], strlen(argv[2]));
-				_pathlocation_[strlen(argv[2])] = '\0';
-				directoryTraverse(_pathlocation_, 0, 1);
+				if(invalidDirectory == 0){
+					char* _pathlocation_ = malloc(sizeof(char) * (strlen(argv[2]) + 1));
+					memcpy(_pathlocation_, argv[2], strlen(argv[2]));
+					_pathlocation_[strlen(argv[2])] = '\0';
+					directoryTraverse(_pathlocation_, 0, 1);
+				}
 				
 			}else if(argv[1][1] == 'd' && argc == 4){ //decompress no recursion
 				hashT = (node**) calloc(sizeHT, sizeof(node*));	
@@ -153,10 +168,12 @@ int main(int argc, char** argv){
 				printHT();
 				printf("%d\n", itemCount);
 				
-				char* _pathlocation_ = malloc(sizeof(char) * (strlen(argv[2]) + 1));
-				memcpy(_pathlocation_, argv[2], strlen(argv[2]));
-				_pathlocation_[strlen(argv[2])] = '\0';
-				directoryTraverse(_pathlocation_, 0, 2);
+				if(invalidDirectory == 0){
+					char* _pathlocation_ = malloc(sizeof(char) * (strlen(argv[2]) + 1));
+					memcpy(_pathlocation_, argv[2], strlen(argv[2]));
+					_pathlocation_[strlen(argv[2])] = '\0';
+					directoryTraverse(_pathlocation_, 0, 2);
+				}
 				
 			}else{
 				printf("Fatal Error: Wrong Arguments\n");
@@ -172,6 +189,7 @@ int main(int argc, char** argv){
 		head = head->next;
 		freeLLnode(temp);
 	}
+	free(escapeseq);
 	return 0;
 }
 	
@@ -187,7 +205,8 @@ void directoryTraverse(char* path, int recursive, int mode){
 		printf("Fatal Error: Directory path does not exist!\n");
 		closedir(dirPath);
 		free(path);
-		exit(0);
+		invalidDirectory = 1;
+		return;
 	}
 	struct dirent* curFile = readdir(dirPath);
 	while(curFile != NULL){
@@ -257,14 +276,17 @@ void fileReading(char* path, char* buffer, int bufferSize, int mode){ //Old Temp
 		memcpy(filename, path, strlen(path));
 		strcat(filename, ".hcz");
 		fw = open(filename, O_WRONLY | O_TRUNC | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
+		printf("filename:%s\n", filename);
+		free(filename);
 	}else if(mode == 2){
 		filename = (char*) malloc((strlen(path)- 3) * sizeof(char));
 		memset(filename, '\0', (strlen(path) - 3) * sizeof(char));
 		memcpy(filename, path, strlen(path) - 4);
 		fw = open(filename, O_WRONLY | O_TRUNC | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
+		printf("filename:%s\n", filename);
+		free(filename);
 	}
-
-	printf("filename:%s\n", filename);
+	
 	if(fd == -1 || fw == -1){
 		if(fd != -1){
 			close(fd);
@@ -273,6 +295,7 @@ void fileReading(char* path, char* buffer, int bufferSize, int mode){ //Old Temp
 			close(fw);
 		}
 		printf("Error: File does not exist: should not be possible\n");
+		invalidDirectory = 1;
 		return;
 	}
 	bufferFill(fd, buffer, bufferSize);
@@ -283,11 +306,12 @@ void fileReading(char* path, char* buffer, int bufferSize, int mode){ //Old Temp
 	word = memset(word, '\0', sizeof(char) * defaultSize);
 	int wordpos = 0;
 	char* bitstring = NULL;
-	int tabCheck = 0;
+	int tabCheck = 1;
 	int escseq = 0;
 	if(mode == 3 || mode == 4){
 		bitstring = (char*) malloc(sizeof(char) * defaultSize);
 		bitstring = memset(bitstring, '\0', sizeof(char) * defaultSize);
+		tabCheck = 0;
 	}
 	
 	while(buffer[0] != '\0'){	
@@ -337,11 +361,11 @@ void fileReading(char* path, char* buffer, int bufferSize, int mode){ //Old Temp
 						}else if(buffer[bufferPos] == '\n'){
 							if(escseq == 0){
 								escseq = 1;
-								escapeseq = word;
+								escapeseq = bitstring;
 								
 								defaultSize = 20;
-								word = (char *)malloc(sizeof(char) * (defaultSize + 1));
-								memset(word, '\0', (sizeof(char) * (defaultSize + 1)));
+								bitstring = (char *)malloc(sizeof(char) * (defaultSize + 1));
+								memset(bitstring, '\0', (sizeof(char) * (defaultSize + 1)));
 								
 							}else{
 								if(itemCount == sizeHT){
@@ -386,16 +410,16 @@ void fileReading(char* path, char* buffer, int bufferSize, int mode){ //Old Temp
 					if(wordpos >= defaultSize){
 						if(tabCheck){
 							defaultSize = defaultSize * 2;
-						  	bitstring = doubleStringSize(bitstring, defaultSize);
-						}else{
-						  	defaultSize = defaultSize * 2;
 						  	word = doubleStringSize(word, defaultSize);
+						}else{
+						 	defaultSize = defaultSize * 2;
+						  	bitstring = doubleStringSize(bitstring, defaultSize);
 					  	}
 			  	  	}
 			  	  	if(tabCheck){
-			  	  		bitstring[wordpos] = buffer[bufferPos];
-			  	  	}else{
 			  	  		word[wordpos] = buffer[bufferPos];
+			  	  	}else{
+			  	  		bitstring[wordpos] = buffer[bufferPos];
 			  	  	}
 			  	  	wordpos++;
 				}
@@ -413,6 +437,9 @@ void fileReading(char* path, char* buffer, int bufferSize, int mode){ //Old Temp
 		free(word);
 	}else{
 		free(word);
+		if(mode == 3 || mode ==  4){
+			free(bitstring);
+		}
 	}
 	if(close(fd) < 0){
 		printf("Warning: File Descriptor would not close\n");
@@ -474,7 +501,7 @@ int getKey(char* word, int size){
 	}
 	int index = hash % size;
 	if(index < 0){
-		printf("Shouldn't ever occur\n");
+		printf("Negative Index: %s\n", word);
 		index *= -1;
 	}
 	return index;
@@ -554,6 +581,7 @@ void freeHT(node** head){
 	free(head);
 }
 void freeNode(node* curNode){
+	free(curNode->bitstring);
 	free(curNode->data);
 	free(curNode);
 }
@@ -704,9 +732,9 @@ void processTree(treeNode* root, char* bitString, int fd){
     }
 	 if(isLeaf(root)){
         printf("%s\t%s\n", root->data, bitString);
-        writeToFile(root->data, strlen(root->data), root->whitespace, fd);
-        writeToFile("\t", strlen("\t"), 0, fd);
         writeToFile(bitString, strlen(bitString), 0, fd);
+        writeToFile("\t", strlen("\t"), 0, fd);
+		  writeToFile(root->data, strlen(root->data), root->whitespace, fd);
         writeToFile("\n", strlen("\n"), 0, fd);
     }	
 
