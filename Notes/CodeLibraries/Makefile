@@ -9,11 +9,14 @@
 
 all:	main compTests
 
-main:	main.c plusOne.o
-	gcc main.c lib/plusOne.o -o bin/main.out
+main:	main.c plusOne.o plusTwo.o
+	gcc main.c lib/plusOne.o lib/plusTwo.o -o bin/main.out
 
 plusOne.o:	plusOne.c
 	gcc -c plusOne.c -o lib/plusOne.o
+
+plusTwo.o: plusTwo.c
+	gcc -c plusTwo.c -o lib/plusTwo.o
 
 clean:
 	rm -rf bin/*
@@ -24,7 +27,7 @@ compTests:	testing/testCode/test0.c testing/testCode/test1.c
 	gcc testing/testCode/test0.c lib/plusOne.o -o bin/test0.out
 	gcc testing/testCode/test1.c lib/plusOne.o -o bin/test1.out
 
-test:	compTests test0 test1
+test:	test0 test1
 	echo "done testing"
 
 test0:	testing/testCode/test0.c lib/plusOne.o bin/test0.out
@@ -32,3 +35,5 @@ test0:	testing/testCode/test0.c lib/plusOne.o bin/test0.out
 
 test1:	testing/testCode/test1.c lib/plusOne.o bin/test1.out
 	./bin/test1.out > testing/outputFiles/Out_1; diff testing/outputFiles/Out1 testing/testCaseResults/Result_1 | wc
+
+everything:	clean all test

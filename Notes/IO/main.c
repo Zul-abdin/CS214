@@ -1,7 +1,9 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
+#include <dirent.h>
 
 int main(int argc, char* argv[]) {
 
@@ -69,6 +71,12 @@ int main(int argc, char* argv[]) {
      *     - So i-nodes can implement both files AND directories
      *   - Use pointers to allow for multiple sized files
      *
+     * Directory Descriptors
+     * - readdir(<name>)
+     * - opendir(DIR* <dir desc.>)
+     * - make sure not to hit/use "./" and "../"
+     * - For asst1, ignore all .hcz files while compressing
+     *
      */
 
     printf("~~~~~~~~~~~~~~~~~~~~~~~~\n");
@@ -117,6 +125,45 @@ int main(int argc, char* argv[]) {
 
 
     printf("~~~~~~~~~~~~~~~~~~~~~~~~\n");
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    char* currentPath = "./";
+
+    DIR* currentDir = opendir("./");
+
+    //Skipping ./ and ../ in a directory
+    //struct dirent* currentElement = NULL;
+    //readdir(currentDir);
+    //readdir(currentDir);
+    //currentElement = readdir(currentDir);
+
+    //while(currentElement != NULL){
+    //    if(currentElement->d_type == DT_DIR){
+    //        printf("Dir: %s", currentElement->d_name);
+    //    } else if(currentElement->d_type == DT_REG){
+    //        printf("File: %s", currentElement->d_name);
+    //    }
+    //}
+
+    struct dirent* currentElement = NULL;
+    readdir(currentDir);
+    readdir(currentDir);
+    currentElement = readdir(currentDir);
+
+    while(currentElement != NULL && currentElement->d_type != DT_DIR){
+        readdir(currentDir);
+    }
+
+    int newpartLen = strlen(currentElement);
+    int pathLen = strlen(currentPath);
+
+    char* newPath = (char*)malloc(sizeof(char)*newpartLen + pathLen + 2);
+
+
+    printf("~~~~~~~~~~~~~~~~~~~~~~~~\n");
+
+
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
