@@ -30,6 +30,11 @@ typedef struct _LLNODE_{
     struct _LLNODE_* next;
 }LLNode;
 
+typedef struct _HEAPNODE_{
+    char* data;
+    int frequency;
+}heapNode;
+
 // Globals
 int itemCount = 0;
 int invalidDirectory = 0;
@@ -37,7 +42,9 @@ int sizeHT = 100;
 LLNode* head = NULL;
 node** hashT = NULL;
 char* escapeseq = NULL;
-
+heapNode* heap;
+int heapCapacity = 0;
+int heapSize = 0;
 
 //File Handling methods
 void directoryTraverse(char* path, int recursive, int mode);
@@ -58,6 +65,7 @@ int searchHT(char* word);
 void printHT();
 void rehash();
 void freeNode(node* node);
+int getKey(char* word, int size);
 
 //Minheap & HuffmanCode methods
 treeNode* createTreeNode(char* data, int frequency, treeNode* left, treeNode* right, int whitespace);
@@ -71,6 +79,20 @@ int isLeaf(treeNode* tNode);
 void freeHT(node** head);
 void freeTree(treeNode* root);
 void freeLLnode(LLNode* node);
+int parentIndex(int pos);
+int leftChildIndex(int pos);
+int rightChildIndex(int pos);
+int hasParent(int pos);
+int hasLeftChild(int pos);
+int hasRightChild(int pos);
+void swap(int pos1, int pos2);
+void checkHeapCapacity();
+void siftUp();
+void siftDown();
+void heapInsert(heapNode newNode);
+heapNode heapRemove();
+heapNode* heapCreateNode(int frequency, char* data);
+
 
 //Escape Sequence creation methods
 void generateEscapeSeq();
@@ -78,6 +100,8 @@ int sequenceChecker(char* word, int wordlength);
 char generatingchar();
 
 int main(int argc, char** argv){
+    heap = malloc(sizeof(heapNode) * 10);
+    heapCapacity = 10;
 	if(argc < 3 && argc > 5){
 		printf("Fatal Error: too many or too few arguments\n");
 		return 0;
@@ -823,4 +847,101 @@ void freeTree(treeNode* root){
 		freeTree(root->right);
 	}
 	free(root);
+}
+
+int parentIndex(int pos){
+    return (pos-1) / 2;
+}
+
+int leftChildIndex(int pos){
+    return (2 * pos) + 1;
+}
+
+int rightChildIndex(int pos){
+    return (2 * pos) + 2;
+}
+
+int hasLeftChild(int pos){
+    if(leftChildIndex(pos) < heapSize){
+        return 1;
+    } else {
+        return 0;
+    }
+}
+int hasRightChild(int pos){
+    if(rightChildIndex(pos) < heapSize){
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+int hasParent(int pos){
+    if(parentIndex(pos) >= 0){
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+void swap(int pos1, int pos2){
+    heapNode temp = heap[pos1];
+    heap[pos1] = heap[pos2];
+    heap[pos2] = temp;
+}
+
+void checkHeapCapacity(){
+    if(heapSize == heapCapacity){
+        heapNode* temp = malloc(sizeof(heapNode) * heapCapacity * 2);
+        memcpy(temp, heap, heapCapacity);
+        free(heap);
+        heap = temp;
+        heapCapacity *= 2;
+    }
+}
+
+void siftUp(){
+    int index = heapSize - 1;
+    while(hasParent(index) && heap[parentIndex(index)].frequency > heap[index].frequency){
+        swap(parentIndex(index), index);
+        index = parentIndex(index);
+    }
+}
+
+void siftDown(){
+    int index = 0;
+    while(hasLeftChild(index)){
+        int lesserChild = leftChildIndex(index);
+        if(hasRightChild(index) && heap[rightChildIndex(index)].frequency < heap[leftChildIndex(index)].frequency){
+            lesserChild = rightChildIndex(index);
+        }
+        if(heap[index].frequency < heap[lesserChild].frequency){
+            break;
+        } else {
+            swap(index, lesserChild);
+        }
+        index = lesserChild;
+    }
+}
+
+void heapInsert(heapNode newNode){
+    checkHeapCapacity();
+    heap[heapSize] = newNode;
+    heapSize++;
+    siftUp();
+}
+
+heapNode heapRemove(){
+    heapNode oldRoot = heap[0];
+    heap[0] = heap[heapSize - 1];
+    heapSize--;
+    siftDown();
+    return oldRoot;
+}
+
+heapNode* heapCreateNode(int frequency, char* data){
+    heapNode* newNode = malloc(sizeof(heapNode));
+    newNode->frequency = frequency;
+    newNode->data = data;
+    return newNode;
 }
