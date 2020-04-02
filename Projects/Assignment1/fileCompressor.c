@@ -51,7 +51,7 @@ void processTree(treeNode* root, char* bitString, int fd);
 int isLeaf(treeNode* tNode);
 void freeHT(node** head);
 void rehash();
-void freeTreenode(treeNode* root);
+void freeTree(treeNode* root);
 void freeLLnode(LLNode* node);
 void writeToFile(char* word, int bytesToWrite, int whitespace, int fd);
 void fileWriting(char*);
@@ -64,18 +64,21 @@ char generatingchar();
 void generateEscapeSeq();
 int searchHT(char* word);
 int sequenceChecker(char* word, int wordlength);
+node* nodeInitialization(char* word, int whitespace, int frequency, char* bitstring);
 
 int main(int argc, char** argv){
 	if(argc < 3 && argc > 5){
 		printf("Fatal Error: too many or too few arguments\n");
 		return 0;
 	}
+	hashT = (node**) calloc(sizeHT, sizeof(node*));	
+	char buffer[100] = {'\0'};
 	if(strlen(argv[1]) == 2 && argv[1][0] == '-' ){
 			if(argv[1][1] == 'R'){
 				if(strlen(argv[2]) == 2 && argv[2][0] == '-'){
 					if(argv[2][0] == '-'){
 						if(argv[2][1] == 'b' && argc == 4){ //build recursion
-							hashT = (node**) calloc(sizeHT, sizeof(node*));
+						
 							char* _pathlocation_ = malloc(sizeof(char) * (strlen(argv[3]) + 1));
 							memcpy(_pathlocation_, argv[3], strlen(argv[3]));
 							_pathlocation_[strlen(argv[3])] = '\0';
@@ -87,13 +90,10 @@ int main(int argc, char** argv){
 								generateEscapeSeq();
 								initializeLL();
 								processLL();
-
 								fileWriting("HuffmanCodebook.txt");
 							}
-						}else if(argv[2][1] == 'c' && argc == 5){ //compress recursion
-							hashT = (node**) calloc(sizeHT, sizeof(node*));				
+						}else if(argv[2][1] == 'c' && argc == 5){ //compress recursion		
 				
-							char buffer[100] = {'\0'};
 							fileReading(argv[4],buffer,sizeof(buffer), 3);
 							printHT();
 							printf("%d\n", itemCount);
@@ -106,8 +106,7 @@ int main(int argc, char** argv){
 							
 							
 						}else if(argv[2][1] == 'd' && argc == 5){ //decompress recursion
-							hashT = (node**) calloc(sizeHT, sizeof(node*));	
-							char buffer[100] = {'\0'};
+
 							fileReading(argv[4],buffer,sizeof(buffer), 4);
 							printHT();
 							printf("%d\n", itemCount);
@@ -122,18 +121,14 @@ int main(int argc, char** argv){
 							
 						}else{
 							printf("Fatal Error: Wrong Arguments\n");
-							return 0;
 						}
 					}else{
 						printf("Fatal Error: Wrong Arguments\n");
-						return 0;
 					}
 				}else{
 					printf("Fatal Error: Wrong Arguments\n");
-					return 0;
 				}
 			}else if(argv[1][1] == 'b' && argc == 3){ //build mode no recursion
-					hashT = (node**) calloc(sizeHT, sizeof(node*));
 					char* _pathlocation_ = malloc(sizeof(char) * (strlen(argv[2]) + 1));
 					memcpy(_pathlocation_, argv[2], strlen(argv[2]));
 					_pathlocation_[strlen(argv[2])] = '\0';
@@ -142,7 +137,6 @@ int main(int argc, char** argv){
 					printf("%d\n", itemCount);
 					if(invalidDirectory == 0){
 						generateEscapeSeq();
-						printf("Writing to file\n");
 						initializeLL();
 						processLL();
 
@@ -150,9 +144,7 @@ int main(int argc, char** argv){
 					}
 
 			}else if(argv[1][1] == 'c' && argc == 4){ //compress no recursion
-				hashT = (node**) calloc(sizeHT, sizeof(node*));				
-				
-				char buffer[100] = {'\0'};
+
 				fileReading(argv[3],buffer,sizeof(buffer), 3);
 				printHT();
 				printf("%d\n", itemCount);
@@ -161,12 +153,12 @@ int main(int argc, char** argv){
 					char* _pathlocation_ = malloc(sizeof(char) * (strlen(argv[2]) + 1));
 					memcpy(_pathlocation_, argv[2], strlen(argv[2]));
 					_pathlocation_[strlen(argv[2])] = '\0';
+					
 					directoryTraverse(_pathlocation_, 0, 1);
 				}
 				
 			}else if(argv[1][1] == 'd' && argc == 4){ //decompress no recursion
-				hashT = (node**) calloc(sizeHT, sizeof(node*));	
-				char buffer[100] = {'\0'};
+				
 				fileReading(argv[3],buffer,sizeof(buffer), 4);
 				printHT();
 				printf("%d\n", itemCount);
@@ -180,11 +172,9 @@ int main(int argc, char** argv){
 				
 			}else{
 				printf("Fatal Error: Wrong Arguments\n");
-				return 0;
 			}
 	}else{
 		printf("Fatal Error: Wrong Arguments\n");
-		return 0;
 	}
 	freeHT(hashT);
 	while(head != NULL){
@@ -299,7 +289,7 @@ void fileReading(char* path, char* buffer, int bufferSize, int mode){ //Old Temp
 		if(fw >= 0){
 			close(fw);
 		}
-		printf("Error: File does not exist: should not be possible\n");
+		printf("Fatal Error: File does not exist\n");
 		invalidDirectory = 1;
 		return;
 	}
@@ -438,7 +428,7 @@ void fileReading(char* path, char* buffer, int bufferSize, int mode){ //Old Temp
 		findBitstring(word, fw);
 		free(word);
 	}else if(mode == 2 && word[0] != '\0'){
-		printf("Error: Compress File formatted improperly\n");
+		printf("Warning: Compress File formatted improperly\n");
 		free(word);
 	}else{
 		free(word);
@@ -491,14 +481,12 @@ int sequenceChecker(char* word, int wordlength){
 }
 int searchHT(char* word){
 	int index = getKey(word, sizeHT);
-	if(hashT[index] != NULL){
-		node* curNode = hashT[index];
-		while(curNode != NULL){
-			if(strcmp(curNode->data, word) == 0){
-				return 1;
-			}
-			curNode = curNode->next;
+	node* curNode = hashT[index];
+	while(curNode != NULL){
+		if(strcmp(curNode->data, word) == 0){
+			return 1;
 		}
+		curNode = curNode->next;
 	}
 	return -1;
 }
@@ -527,8 +515,8 @@ int findBitstring(char* word, int fd){
 		curNode = curNode->next;
 	}
 	return -1;
-	printf("Not found in the list of Huffman Codes\n");
 }
+
 char* getWhitespace(char* word){
 	char letter = word[strlen(word) - 1];
 	char* temp = malloc(sizeof(char) * 2);
@@ -546,16 +534,16 @@ char* getWhitespace(char* word){
 					break;
 		case 'r': temp[0] = '\r';
 					break;
-		default: printf("ERROR: escape seq detected but not valid whitespace\n");
+		default: printf("Warning: escape sequence detected but not valid whitespace\n");
 					break;
 	}
 	free(word);
 	return temp;
 }
 
-char* doubleStringSize(char* word, int size){
-	char* expanded =  (char*) malloc(sizeof(char) * (size + 1));
-	memset(expanded, '\0', (size+1) * sizeof(char));
+char* doubleStringSize(char* word, int newsize){
+	char* expanded =  (char*) malloc(sizeof(char) * (newsize + 1));
+	memset(expanded, '\0', (newsize+1) * sizeof(char));
 	memcpy(expanded, word, strlen(word));
 	free(word);
 	return expanded;
@@ -569,7 +557,7 @@ int getKey(char* word, int size){
 	}
 	int index = hash % size;
 	if(index < 0){
-		printf("Negative Index: %s\n", word);
+		//printf("Negative Index: %s\n", word);
 		index *= -1;
 	}
 	return index;
@@ -578,6 +566,7 @@ int getKey(char* word, int size){
 void rehash(){
 	sizeHT = sizeHT * 2;
 	node** newHT = (node**) calloc(sizeHT,sizeof(node*));
+	
 	node** oldHead = hashT;
 	hashT = newHT;
 	
@@ -596,15 +585,10 @@ void rehash(){
 
 void insertHT(char* word, int whitespace, int frequency, int rehashing, char* bitstring){
 	int index = getKey(word, sizeHT);
-	node* newNode = (node *)malloc(sizeof(node) * 1);
-	newNode->data = word;
-	printf("%s\n", newNode->data);
-	newNode->next = NULL;
-	newNode->prev = NULL;
-	newNode->frequency = frequency;
-	newNode->whitespace = whitespace;
-	newNode->bitstring = bitstring;
-	if(hashT[index] != NULL){
+	node* newNode = nodeInitialization(word, whitespace, frequency, bitstring);
+	if(hashT[index] == NULL){
+		hashT[index] = newNode;
+	}else{
 		node* curNode = hashT[index];
 		node* prevNode = curNode;
 		while(curNode != NULL){
@@ -618,12 +602,26 @@ void insertHT(char* word, int whitespace, int frequency, int rehashing, char* bi
 		}
 		prevNode->next = newNode;
 		newNode->prev = prevNode;
-	}else{
-		hashT[index] = newNode;
 	}
 	if(rehashing == 0){
 		itemCount++;
 	}
+}
+
+node* nodeInitialization(char* word, int whitespace, int frequency, char* bitstring){
+	node* newNode = (node *) malloc(sizeof(node) * 1);
+	
+	newNode->data = word;
+	newNode->frequency = frequency;
+	newNode->whitespace = whitespace;
+	newNode->bitstring = bitstring;
+	
+	newNode->next = NULL;
+	newNode->prev = NULL;
+	
+	printf("%s\n", newNode->data); 
+	
+	return newNode;
 }
 
 void printHT(){
@@ -648,6 +646,7 @@ void freeHT(node** head){
 	}
 	free(head);
 }
+
 void freeNode(node* curNode){
 	free(curNode->bitstring);
 	free(curNode->data);
@@ -724,22 +723,19 @@ void processLL(){
         LLSortedInsert(newNode);
     }
 }
+
 void freeLLnode(LLNode* node){
-	freeTreenode(node->data);
+	freeTree(node->data);
 	free(node);
 }
 
-void freeTreenode(treeNode* root){	
-	/*if(root == NULL){ //some error checking
-		return;
-	}
-	*/
+void freeTree(treeNode* root){	
 	free(root->data);
 	if(root->left != NULL){
-		freeTreenode(root->left);
+		freeTree(root->left);
 	}
 	if(root->right != NULL){
-		freeTreenode(root->right);
+		freeTree(root->right);
 	}
 	free(root);
 }
@@ -761,7 +757,7 @@ char* sequenceReplace(char* word){
 					break;
 		case '\r': temp[0] = 'r';
 					break;
-		default: printf("ERROR: whitespace is not actually a whitespace character\n");
+		default: printf("Warning: whitespace detected but could not return the character presentation\n");
 					break;
 	}
 	free(word);
@@ -784,7 +780,7 @@ void writeToFile(char* word, int bytesToWrite, int whitespace, int fd){
 	while(bytesWritten < bytesToWrite){
 		status = write(fd, (word + bytesWritten), (bytesToWrite - bytesWritten));
 		if(status == -1){
-			printf("Error: write failed\n");
+			printf("Warning: write encountered an error\n");
 			return;
 		}
 		bytesWritten += status;
