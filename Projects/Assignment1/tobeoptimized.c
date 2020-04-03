@@ -970,7 +970,6 @@ char* sequenceReplace(char* word){
 		default: printf("Warning: delimiter detected but could not return the character presentation\n");
 					break;
 	}
-	free(word);
 	return temp;
 }
 
@@ -980,7 +979,6 @@ void freeLLnode(LLNode* node){
 }
 
 void freeTree(treeNode* root){	
-	free(root->data);
 	if(root->left != NULL){
 		freeTree(root->left);
 	}
