@@ -96,7 +96,7 @@ heapNode* heapCreateNode(int frequency, char* data);
 
 //Escape Sequence creation methods
 void generateEscapeSeq();
-int sequenceChecker(char* word, int wordlength);
+int sequenceChecker(char* word);
 char generatingchar();
 
 int main(int argc, char** argv){
@@ -123,7 +123,7 @@ int main(int argc, char** argv){
 						generateEscapeSeq();
 						initializeLL();
 						processLL();
-						buildHuffman("HuffmanCodebook.txt");
+						buildHuffman("HuffmanCodebook");
 					}
 				}else if(argv[2][1] == 'c' && argc == 5){ //compress recursion		
 					fileReading(argv[4],buffer,sizeof(buffer), 3);
@@ -165,7 +165,7 @@ int main(int argc, char** argv){
 					generateEscapeSeq();
 					initializeLL();
 					processLL();
-					buildHuffman("HuffmanCodebook.txt");
+					buildHuffman("HuffmanCodebook");
 				}
 		}else if(argv[1][1] == 'c' && argc == 4){ //compress no recursion
 			fileReading(argv[3],buffer,sizeof(buffer), 3);
@@ -349,7 +349,7 @@ void fileReading(char* path, char* buffer, int bufferSize, int mode){
 					}
 				}
 			}else {
-				if(isspace(buffer[bufferPos])){
+				if(iscntrl(buffer[bufferPos]) != 0 || buffer[bufferPos] == ' '){
 					if(mode == 0){
 						if(itemCount == sizeHT){
 							rehash();
@@ -385,7 +385,7 @@ void fileReading(char* path, char* buffer, int bufferSize, int mode){
 								if(itemCount == sizeHT){
 									rehash();
 								}
-								if(strlen(word) == (strlen(escapeseq) + 1) && memcmp(word, escapeseq, strlen(escapeseq)) == 0){
+								if(strlen(word) >= (strlen(escapeseq)) && memcmp(word, escapeseq, strlen(escapeseq)) == 0){
 									word = getWhitespace(word);
 								}
 								if(mode == 4){
@@ -403,7 +403,7 @@ void fileReading(char* path, char* buffer, int bufferSize, int mode){
 							}
 							
 						}else{
-							printf("Warning: Huffman Codebook not formatted correctly\n");
+							//printf("Warning: Huffman Codebook not formatted correctly\n");
 						}
 					}else if(mode == 1){
 						findBitstring(word, fw);
@@ -458,7 +458,7 @@ void fileReading(char* path, char* buffer, int bufferSize, int mode){
 	if(close(fd) < 0){
 		printf("Warning: File Descriptor would not close\n");
 	}
-	if(mode == 1 && close(fw) < 0){
+	if((mode == 1 || mode == 2) && close(fw) < 0){
 		printf("Warning: File Descriptor would not close\n");
 	}
 }
@@ -481,12 +481,13 @@ void bufferFill(int fd, char* buffer, int bytesToRead){
     }while(bytesRead < bytesToRead);
 }
 
-void writeToFile(char* word, int bytesToWrite, int whitespace, int fd){
+void writeToFile(char* word, int bytesToWrite, int delimiter, int fd){
 	int bytesWritten = 0;
 	int status = 0;
-	if(whitespace){ //This case: bytesToWrite should be 1 so we do not need to change it when we turn whitespace to its counterpart
+	if(delimiter){ 
 		writeToFile(escapeseq, strlen(escapeseq), 0, fd);
 		word = sequenceReplace(word); 
+		bytesToWrite = strlen(word);
 	}
 	while(bytesWritten < bytesToWrite){
 		status = write(fd, (word + bytesWritten), (bytesToWrite - bytesWritten));
@@ -496,7 +497,7 @@ void writeToFile(char* word, int bytesToWrite, int whitespace, int fd){
 		}
 		bytesWritten += status;
 	}
-	if(whitespace){
+	if(delimiter){
 		free(word);
 	}
 }
@@ -515,26 +516,26 @@ void generateEscapeSeq(){
 		char temp = generatingchar();
 		escapeseq[defaultSize - 2] = temp;
 		defaultSize = defaultSize + 1;
-		if(sequenceChecker(escapeseq, defaultSize) == -1){
+		if(sequenceChecker(escapeseq) == -1){
 			validEscapeSeq = 1;
 		}
 	}while(validEscapeSeq == 0);
 }
 
-int sequenceChecker(char* word, int wordlength){
-	if(searchHT(word) == 1){
-		return 1;
-	}
-	int i;
-	char ws[] = {'n','s','t','v','f','r'};
-	for(i = 0; i < 6; ++i){
-		word[wordlength - 2] = ws[i];
-		if(searchHT(word) == 1){
-			word[wordlength - 2] = '\0';
-			return 1;
+int sequenceChecker(char* word){
+	node* curNode = NULL;
+	int i = 0;
+	for(i = 0; i < sizeHT; ++i){
+		curNode = hashT[i];
+		while(curNode != NULL){
+			if(strlen(curNode->data) >= strlen(word)){
+				if(memcmp(curNode->data, word, strlen(word)) == 0){
+					return 1;
+				}
+			}
+			curNode = curNode->next;
 		}
 	}
-	word[wordlength - 2] = '\0';
 	return -1;
 }
 
@@ -560,23 +561,78 @@ char* doubleStringSize(char* word, int newsize){
 }
 
 char* getWhitespace(char* word){
-	char letter = word[strlen(word) - 1];
+	char* code = (word + strlen(escapeseq));
+	int letter = atoi(code);
 	char* temp = malloc(sizeof(char) * 2);
 	memset(temp, '\0', (sizeof(char) * 2));
 	switch(letter){
-		case 'n': temp[0] = '\n';
+		case 0: temp[0] = 0;
 					break;
-		case 's': temp[0] = ' ';
+		case 1: temp[0] = 1;
 					break;
-		case 't': temp[0] = '\t';
+		case 2: temp[0] = 2;
 					break;
-		case 'v': temp[0] = '\v';
+		case 3: temp[0] = 3;
 					break;
-		case 'f': temp[0] = '\f';
+		case 4: temp[0] = 4;
 					break;
-		case 'r': temp[0] = '\r';
+		case 5: temp[0] = 5;
 					break;
-		default: printf("Warning: escape sequence detected but not valid whitespace\n");
+		case 6: temp[0] = 6;
+					break;
+		case 7: temp[0] = 7;
+					break;
+		case 8: temp[0] = 8;
+					break;
+		case 9: temp[0] = 9;
+					break;
+		case 10: temp[0] = 10;
+					break;
+		case 11: temp[0] = 11;
+					break;
+		case 12: temp[0] = 12;
+					break;
+		case 13: temp[0] = 13;
+					break;
+		case 14: temp[0] = 14;
+					break;
+		case 15: temp[0] = 15;
+					break;
+		case 16: temp[0] = 16;
+					break;
+		case 17: temp[0] = 17;
+					break;
+		case 18: temp[0] = 18;
+					break;
+		case 19: temp[0] = 19;
+					break;
+		case 20: temp[0] = 20;
+					break;
+		case 21: temp[0] = 21;
+					break;
+		case 22: temp[0] = 22;
+					break;
+		case 23: temp[0] = 23;
+					break;
+		case 24: temp[0] = 24;
+					break;
+		case 25: temp[0] = 25;
+					break;
+		case 26: temp[0] = 26;
+					break;
+		case 27: temp[0] = 27;
+					break;
+		case 28: temp[0] = 28;
+					break;
+		case 29: temp[0] = 29;
+					break;
+		case 30: temp[0] = 30;
+					break;
+		case 31: temp[0] = 31;
+					break;
+		case 32: temp[0] = ' ';
+					break;
+		default: printf("Warning: escape sequence detected but not valid control code\n");
 					break;
 	}
 	free(word);
@@ -810,23 +866,77 @@ void buildHuffman(char* filename){
 }
 
 char* sequenceReplace(char* word){
-	char* temp = malloc(sizeof(char) * 2);
-	memset(temp, '\0', (sizeof(char) * 2));
+	char* temp = malloc(sizeof(char) * 3);
+	memset(temp, '\0', (sizeof(char) * 3));
 	char temp1 = word[0];
 	switch(temp1){
-		case '\n': temp[0] = 'n';
+		case 0: memcpy(temp, "0", strlen("0"));
 					break;
-		case ' ': temp[0] = 's';
+		case 1: memcpy(temp, "1", strlen("1"));
 					break;
-		case '\t': temp[0] = 't';
+		case 2: memcpy(temp, "2", strlen("2"));
 					break;
-		case '\v': temp[0] = 'v';
+		case 3: memcpy(temp, "3", strlen("3"));
 					break;
-		case '\f': temp[0] = 'f';
+		case 4: memcpy(temp, "4", strlen("4"));
 					break;
-		case '\r': temp[0] = 'r';
+		case 5: memcpy(temp, "5", strlen("5"));
 					break;
-		default: printf("Warning: whitespace detected but could not return the character presentation\n");
+		case 6: memcpy(temp, "6", strlen("6"));
+					break;
+		case 7: memcpy(temp, "7", strlen("7"));
+					break;
+		case 8: memcpy(temp, "8", strlen("8"));
+					break;
+		case 9: memcpy(temp, "9", strlen("9"));
+					break;
+		case 10: memcpy(temp, "10", strlen("10"));
+					break;
+		case 11: memcpy(temp, "11", strlen("11"));
+					break;
+		case 12: memcpy(temp, "12", strlen("12"));
+					break;
+		case 13: memcpy(temp, "13", strlen("13"));
+					break;
+		case 14: memcpy(temp, "14", strlen("14"));
+					break;
+		case 15: memcpy(temp, "15", strlen("15"));
+					break;
+		case 16: memcpy(temp, "16", strlen("16"));
+					break;
+		case 17: memcpy(temp, "17", strlen("17"));
+					break;
+		case 18: memcpy(temp, "18", strlen("18"));
+					break;
+		case 19: memcpy(temp, "19", strlen("19"));
+					break;
+		case 20: memcpy(temp, "20", strlen("20"));
+					break;
+		case 21: memcpy(temp, "21", strlen("21"));
+					break;
+		case 22: memcpy(temp, "22", strlen("22"));
+					break;
+		case 23: memcpy(temp, "23", strlen("23"));
+					break;
+		case 24: memcpy(temp, "24", strlen("24"));
+					break;
+		case 25: memcpy(temp, "25", strlen("25"));
+					break;
+		case 26: memcpy(temp, "26", strlen("26"));
+					break;
+		case 27: memcpy(temp, "27", strlen("27"));
+					break;
+		case 28: memcpy(temp, "28", strlen("28"));
+					break;
+		case 29: memcpy(temp, "29", strlen("29"));
+					break;
+		case 30: memcpy(temp, "30", strlen("30"));
+					break;
+		case 31: memcpy(temp, "31", strlen("31"));
+					break;
+		case ' ': memcpy(temp, "32", strlen("32"));
+					break;
+		default: printf("Warning: delimiter detected but could not return the character presentation\n");
 					break;
 	}
 	free(word);
