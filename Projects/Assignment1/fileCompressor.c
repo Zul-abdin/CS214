@@ -35,6 +35,14 @@ typedef struct _HEAPNODE_{
     int frequency;
 }heapNode;
 
+typedef struct _AVLNODE_{
+	char* data;
+	int frequency;
+	int height;
+	struct _AVLNODE_* left;
+	struct _AVLNODE_* right;
+}avlnode;
+
 // Globals
 int itemCount = 0;
 int invalidDirectory = 0;
