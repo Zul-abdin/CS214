@@ -65,6 +65,7 @@ char* pathCreator(char* path, char* name);
 int findBitstring(char* word, int fd);
 char* doubleStringSize(char* word, int size);
 char* getWhitespace(char*);
+int isFile(char* path);
 
 //Hashtable methods
 void insertHT(char* word, int whitespace, int frequency, int rehashing, char* bitstring);
@@ -144,7 +145,6 @@ int main(int argc, char** argv){
 						directoryTraverse(_pathlocation_, 1, 1);
 					}		
 				}else if(argv[2][1] == 'd' && argc == 5){ //decompress recursion
-
 					fileReading(argv[4],buffer,sizeof(buffer), 4);
 					printHT();
 					printf("%d\n", itemCount);
@@ -163,30 +163,52 @@ int main(int argc, char** argv){
 				printf("Fatal Error: Wrong Arguments\n");
 			}
 		}else if(argv[1][1] == 'b' && argc == 3){ //build mode no recursion
-				fileReading(argv[2], buffer, sizeof(buffer), 0);
-				printHT();
-				printf("%d\n", itemCount);
-				if(invalidDirectory == 0){
-					generateEscapeSeq();
-					initializeLL();
-					processLL();
-					buildHuffman("HuffmanCodebook");
+				if(isFile(argv[2]) == 1){
+					fileReading(argv[2], buffer, sizeof(buffer), 0);
+					printHT();
+					printf("%d\n", itemCount);
+					if(invalidDirectory == 0){
+						generateEscapeSeq();
+						initializeLL();
+						processLL();
+						buildHuffman("HuffmanCodebook");
+					}
+				}else{
+					printf("Fatal Error: Not a file\n");
 				}
-		}else if(argv[1][1] == 'c' && argc == 4){ //compress no recursion
-			fileReading(argv[3],buffer,sizeof(buffer), 3);
-			printHT();
-			printf("%d\n", itemCount);	
-			if(invalidDirectory == 0){
-				fileReading(argv[2], buffer, sizeof(buffer), 1);
-			}
 				
-		}else if(argv[1][1] == 'd' && argc == 4){ //decompress no recursion
-			fileReading(argv[3],buffer,sizeof(buffer), 4);
-			printHT();
-			printf("%d\n", itemCount);	
-			if(invalidDirectory == 0){
-				fileReading(argv[2], buffer, sizeof(buffer), 2);
+		}else if(argv[1][1] == 'c' && argc == 4){ //compress no recursion
+			if(isFile(argv[3]) == 1){
+				fileReading(argv[3],buffer,sizeof(buffer), 3);
+				printHT();
+				printf("%d\n", itemCount);	
+				if(invalidDirectory == 0){
+					if(isFile(argv[2]) == 1){
+						fileReading(argv[2], buffer, sizeof(buffer), 1);
+					}else{
+						printf("Fatal Error: Not a file\n");
+					}
+				}
+			}else{
+				printf("Fatal Error: Not a file\n");
 			}
+			
+		}else if(argv[1][1] == 'd' && argc == 4){ //decompress no recursion
+			if(isFile(argv[3]) == 1){
+				fileReading(argv[3],buffer,sizeof(buffer), 4);
+				printHT();
+				printf("%d\n", itemCount);	
+				if(invalidDirectory == 0){
+					if(isFile(argv[2]) == 1){
+						fileReading(argv[2], buffer, sizeof(buffer), 2);
+					}else{
+						printf("Fatal Error: Not a file\n");
+					}
+				}
+			}else{
+				printf("Fatal Error: Not a file\n");
+			}
+			
 		}else{
 			printf("Fatal Error: Wrong Arguments\n");
 		}
@@ -269,6 +291,17 @@ char* pathCreator(char* path, char* name){
 	memcpy((newpath + strlen(path) + 1), name, (strlen(name)));
 	newpath[strlen(name) + strlen(path) + 1] = '\0';
 	return newpath;
+}
+
+int isFile(char* path){
+	DIR* dirpath = opendir(path);
+	if(!dirpath){
+		closedir(dirpath);
+		return 1;
+	}else{
+		closedir(dirpath);
+		return -1;
+	}
 }
 /*
 	fileReading modes:
