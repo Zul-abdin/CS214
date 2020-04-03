@@ -1,0 +1,10 @@
+This is a simple test involving irregular spaces, as well as Tabs and New Lines
+Here are some Spaces ->                   <--
+Here are some Tabs ->                       <--
+Here are some New Lines ->
+
+
+
+
+
+<----
