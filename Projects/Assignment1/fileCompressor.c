@@ -126,7 +126,7 @@ int main(int argc, char** argv){
 					directoryTraverse(_pathlocation_, 1, 0);
 					printHT();
 					printf("%d\n", itemCount);
-
+					
 					if(invalidDirectory == 0){
 						generateEscapeSeq();
 						initializeLL();
@@ -224,10 +224,13 @@ int main(int argc, char** argv){
 void directoryTraverse(char* path, int recursive, int mode){ 
 	DIR* dirPath = opendir(path);
 	if(!dirPath){
-		printf("Fatal Error: Directory path does not exist!\n");
-		closedir(dirPath);
-		free(path);
-		invalidDirectory = 1;
+		char buffer[100] = {'\0'};
+		fileReading(path, buffer, sizeof(buffer), mode);
+		if(invalidDirectory == 1){
+			printf("Fatal Error: Directory path or file does not exist!\n");
+			closedir(dirPath);
+			free(path);
+		}
 		return;
 	}
 	struct dirent* curFile = readdir(dirPath);
@@ -316,7 +319,7 @@ void fileReading(char* path, char* buffer, int bufferSize, int mode){
 		if(fw >= 0){
 			close(fw);
 		}
-		printf("Fatal Error: File does not exist\n");
+		printf("Error: File does not exist\n");
 		invalidDirectory = 1;
 		return;
 	}
