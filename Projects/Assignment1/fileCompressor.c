@@ -163,7 +163,7 @@ int main(int argc, char** argv){
 				printf("Fatal Error: Wrong Arguments\n");
 			}
 		}else if(argv[1][1] == 'b' && argc == 3){ //build mode no recursion
-				fileReading(argv[2], buffer, sizeof(buffer, 0);
+				fileReading(argv[2], buffer, sizeof(buffer), 0);
 				printHT();
 				printf("%d\n", itemCount);
 				if(invalidDirectory == 0){
@@ -187,7 +187,6 @@ int main(int argc, char** argv){
 			if(invalidDirectory == 0){
 				fileReading(argv[2], buffer, sizeof(buffer), 2);
 			}
-				
 		}else{
 			printf("Fatal Error: Wrong Arguments\n");
 		}
