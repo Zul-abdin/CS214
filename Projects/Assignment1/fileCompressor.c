@@ -168,10 +168,10 @@ int main(int argc, char** argv){
 				//printHT();
 				//printf("%d\n", itemCount);	
 				if(invalidDirectory == 0){
-					if(isFile(argv[2]) == 1){
+					if(isFile(argv[2]) == 1 && strlen(argv[2]) > 4 && strcmp(argv[2] + (strlen(argv[2]) - 4), ".hcz") == 0){
 						fileReading(argv[2], buffer, sizeof(buffer), 2);
 					}else{
-						printf("Fatal Error: Not a file\n");
+						printf("Fatal Error: Not a compressed file (must have .hcz extension)\n");
 					}
 				}
 			}else{
@@ -282,6 +282,11 @@ int isFile(char* path){
 */
 void fileReading(char* path, char* buffer, int bufferSize, int mode){ 
 	int fd = open(path, O_RDONLY);
+	if(fd == -1){
+		printf("Fatal Error: File does not exist\n");
+		invalidDirectory = 1;
+		return; 
+	}
 	int fw = -2;
 	char* filename = NULL;
 	if(mode == 1){
@@ -301,14 +306,14 @@ void fileReading(char* path, char* buffer, int bufferSize, int mode){
 		free(filename);
 	}
 	
-	if(fd == -1 || fw == -1){
+	if(fw == -1){
 		if(fd != -1){
 			close(fd);
 		}
 		if(fw >= 0){
 			close(fw);
 		}
-		printf("Fatal Error: File does not exist\n");
+		printf("Fatal Error: File could not be created\n");
 		invalidDirectory = 1;
 		return; 
 	}
