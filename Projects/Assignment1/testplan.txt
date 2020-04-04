@@ -16,4 +16,8 @@ To test our file we used combinations of the following scenarios (in individual 
 	Files with only escape characters
 	Files with escape characters and other tokens
 	Files with possible escape sequences created by the program; ex: $&*#, $, $**#
-
+	Files with various extensions (.txt, .c, etc.) and files with no extensions
+	Directories with nothing but a directory inside
+	Files and Folders named "hcz"
+	Files with all ASCII characters
+	Files with non-ASCII characters

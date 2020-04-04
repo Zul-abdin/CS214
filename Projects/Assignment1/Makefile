@@ -2,7 +2,7 @@ all:	main
 
 main:	fileCompressor.out
 
-test:	bin/fileCompressor.out testOutput test0.txt test1 test2.txt test3 simplerecursivetest recursivetest1 recursivetest2 recursivetest3
+test:	bin/fileCompressor.out testOutput test0.txt test1 test2.txt test3 simplerecursivetest recursivetest1 recursivetest2 recursivetest3 singleRecTest similarNameTest asciiArtTest TheCanterburyCorpusTests hcz
 	@rm -rf testing/testOutput
 	@echo "Done with all tests"
 
