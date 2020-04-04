@@ -4,7 +4,11 @@ To test our file we used combinations of the following scenarios (in individual 
 	Attempting to compress or decompress without codebook
 	Attempting to use files recursively
 	Attempting to use a directory non-recursively
+	Attempting to use -R after -c or -d
+	Attempting to use undefined flags
 	Attempting to use a path that does not exist
+	Attempting to decompress a non .hcz file
+	Attempting to decompress a directory with no .hcz file in it
 	Running compression twice to check if .hcz files are re-compressed
 	Tokens larger than 100 characters
 	Tokens larger than 1000 characters
@@ -21,3 +25,5 @@ To test our file we used combinations of the following scenarios (in individual 
 	Files and Folders named "hcz"
 	Files with all ASCII characters
 	Files with non-ASCII characters
+	Hidden Files and Directories (According to user's Operating System)
+	Hidden Files and Directories (beginning with .)

@@ -37,6 +37,7 @@ int sizeHT = 100;
 LLNode* head = NULL;
 node** hashT = NULL;
 char* escapeseq = NULL;
+int compressionCount = 0;
 
 //File Handling methods
 void directoryTraverse(char* path, int recursive, int mode);
@@ -193,6 +194,11 @@ int main(int argc, char** argv){
 	if(escapeseq != NULL){
 		free(escapeseq);
 	}
+
+	if(argv[2][1] == 'd' &&compressionCount == 0) {
+        printf("Warning: Directory contains no decompressable files");
+    }
+
 	return 0;
 }
 	
@@ -225,6 +231,7 @@ void directoryTraverse(char* path, int recursive, int mode){
 			if(strlen(curFile->d_name) > 4 && strcmp((curFile->d_name + (strlen(curFile->d_name) - 4)), ".hcz") == 0){
 				//printf("Compress file found\n");
 				compressFile = 1;
+				compressionCount++;
 			}
 			if(mode == 0 && compressFile == 0){
 				//printf("Building the HufmanCodebook\n");

@@ -1,8 +1,9 @@
 all:	main
 
-main:	fileCompressor.out
+main:	fileCompressor.c
+	gcc fileCompressor.c -o fileCompressor
 
-test:	bin/fileCompressor.out testOutput test0.txt test1 test2.txt test3 simplerecursivetest recursivetest1 recursivetest2 recursivetest3 singleRecTest similarNameTest asciiArtTest TheCanterburyCorpusTests hcz
+test:	bin/fileCompressor.out testOutput test0.txt test1 test2.txt test3 simplerecursivetest recursivetest1 recursivetest2 recursivetest3 singleRecTest similarNameTest asciiArtTest TheCanterburyCorpusTests hcz .HiddenDir HiddenOSDir
 	@rm -rf testing/testOutput
 	@echo "Done with all tests"
 
@@ -19,7 +20,7 @@ testOutput:
 	gcc $< -o $@
 
 clean:
-	rm -f fileCompressor.out
+	rm -f fileCompressor
 	rm -rf bin
 	rm -rf testing/testOutput
 
