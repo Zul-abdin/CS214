@@ -222,7 +222,7 @@ void directoryTraverse(char* path, int recursive, int mode){
 			char* filepath = pathCreator(path, curFile->d_name);
 			//printf("File path: %s\n", filepath);
 			int compressFile = 0;
-			if(strlen(curFile->d_name) > 7 && strcmp((curFile->d_name + (strlen(curFile->d_name) - 3)), "hcz") == 0){
+			if(strlen(curFile->d_name) > 4 && strcmp((curFile->d_name + (strlen(curFile->d_name) - 4)), ".hcz") == 0){
 				//printf("Compress file found\n");
 				compressFile = 1;
 			}
