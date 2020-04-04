@@ -332,7 +332,7 @@ void fileReading(char* path, char* buffer, int bufferSize, int mode){
 		for(bufferPos = 0; bufferPos < (bufferSize/sizeof(buffer[0])); ++bufferPos){
 			if(mode == 2){
 				if(buffer[bufferPos] == '\n'){
-					//printf("Last token processed\n");
+					
 				}else{
 					if(wordpos >= defaultSize){
 						defaultSize = defaultSize * 2;
@@ -407,7 +407,8 @@ void fileReading(char* path, char* buffer, int bufferSize, int mode){
 						}
 					}else if(mode == 1){
 						findBitstring(word, fw);
-						char* temp = malloc(sizeof(char) * 1);
+						char* temp = malloc(sizeof(char) * 2);
+						memset(temp, '\0', sizeof(char) * 2);
 						temp[0] = buffer[bufferPos];
 						findBitstring(temp, fw);
 						free(word);
