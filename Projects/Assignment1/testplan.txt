@@ -1,0 +1,19 @@
+To test our file we used combinations of the following scenarios (in individual files as well as in directories):
+	Empty Directories
+	Empty Files
+	Attempting to compress or decompress without codebook
+	Attempting to use files recursively
+	Attempting to use a directory non-recursively
+	Attempting to use a path that does not exist
+	Running compression twice to check if .hcz files are re-compressed
+	Tokens larger than 100 characters
+	Tokens larger than 1000 characters
+	Tokens of size between 1 and 100
+	Tokens of size 1
+	Files with one token
+	Files with over 100 tokens
+	Files with over 1000 tokens
+	Files with only escape characters
+	Files with escape characters and other tokens
+	Files with possible escape sequences created by the program; ex: $&*#, $, $**#
+
