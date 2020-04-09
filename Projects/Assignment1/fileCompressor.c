@@ -969,4 +969,3 @@ void freeTree(treeNode* root){
 	}
 	free(root);
 }
-
