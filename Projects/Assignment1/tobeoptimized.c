@@ -30,6 +30,19 @@ typedef struct _LLNODE_{
     struct _LLNODE_* next;
 }LLNode;
 
+typedef struct _HEAPNODE_{
+    char* data;
+    int frequency;
+}heapNode;
+
+typedef struct _AVLNODE_{
+	char* data;
+	int frequency;
+	int height;
+	struct _AVLNODE_* left;
+	struct _AVLNODE_* right;
+}avlnode;
+
 // Globals
 int itemCount = 0;
 int invalidDirectory = 0;
@@ -37,7 +50,9 @@ int sizeHT = 100;
 LLNode* head = NULL;
 node** hashT = NULL;
 char* escapeseq = NULL;
-int compressionCount = 0;
+heapNode* heap;
+int heapCapacity = 0;
+int heapSize = 0;
 
 //File Handling methods
 void directoryTraverse(char* path, int recursive, int mode);
@@ -73,6 +88,19 @@ int isLeaf(treeNode* tNode);
 void freeHT(node** head);
 void freeTree(treeNode* root);
 void freeLLnode(LLNode* node);
+int parentIndex(int pos);
+int leftChildIndex(int pos);
+int rightChildIndex(int pos);
+int hasParent(int pos);
+int hasLeftChild(int pos);
+int hasRightChild(int pos);
+void swap(int pos1, int pos2);
+void checkHeapCapacity();
+void siftUp();
+void siftDown();
+void heapInsert(heapNode newNode);
+heapNode heapRemove();
+heapNode* heapCreateNode(int frequency, char* data);
 
 
 //Escape Sequence creation methods
@@ -81,6 +109,8 @@ int sequenceChecker(char* word);
 char generatingchar();
 
 int main(int argc, char** argv){
+    heap = malloc(sizeof(heapNode) * 10);
+    heapCapacity = 10;
 	if(argc < 3 && argc > 5){
 		printf("Fatal Error: too many or too few arguments\n");
 		return 0;
@@ -95,8 +125,8 @@ int main(int argc, char** argv){
 					memcpy(_pathlocation_, argv[3], strlen(argv[3]));
 					_pathlocation_[strlen(argv[3])] = '\0';
 					directoryTraverse(_pathlocation_, 1, 0);
-					//printHT();
-					//printf("%d\n", itemCount);
+					printHT();
+					printf("%d\n", itemCount);
 					
 					if(invalidDirectory == 0){
 						generateEscapeSeq();
@@ -106,8 +136,8 @@ int main(int argc, char** argv){
 					}
 				}else if(argv[2][1] == 'c' && argc == 5){ //compress recursion		
 					fileReading(argv[4],buffer,sizeof(buffer), 3);
-					//printHT();
-					//printf("%d\n", itemCount);
+					printHT();
+					printf("%d\n", itemCount);
 					if(invalidDirectory == 0){
 						char* _pathlocation_ = malloc(sizeof(char) * (strlen(argv[3]) + 1));
 						memcpy(_pathlocation_, argv[3], strlen(argv[3]));
@@ -116,8 +146,8 @@ int main(int argc, char** argv){
 					}		
 				}else if(argv[2][1] == 'd' && argc == 5){ //decompress recursion
 					fileReading(argv[4],buffer,sizeof(buffer), 4);
-					//printHT();
-					//printf("%d\n", itemCount);
+					printHT();
+					printf("%d\n", itemCount);
 							
 					if(invalidDirectory == 0){
 						char* _pathlocation_ = malloc(sizeof(char) * (strlen(argv[3]) + 1));
@@ -135,8 +165,8 @@ int main(int argc, char** argv){
 		}else if(argv[1][1] == 'b' && argc == 3){ //build mode no recursion
 				if(isFile(argv[2]) == 1){
 					fileReading(argv[2], buffer, sizeof(buffer), 0);
-					//printHT();
-					//printf("%d\n", itemCount);
+					printHT();
+					printf("%d\n", itemCount);
 					if(invalidDirectory == 0){
 						generateEscapeSeq();
 						initializeLL();
@@ -150,8 +180,8 @@ int main(int argc, char** argv){
 		}else if(argv[1][1] == 'c' && argc == 4){ //compress no recursion
 			if(isFile(argv[3]) == 1){
 				fileReading(argv[3],buffer,sizeof(buffer), 3);
-				//printHT();
-				//printf("%d\n", itemCount);	
+				printHT();
+				printf("%d\n", itemCount);	
 				if(invalidDirectory == 0){
 					if(isFile(argv[2]) == 1){
 						fileReading(argv[2], buffer, sizeof(buffer), 1);
@@ -166,13 +196,13 @@ int main(int argc, char** argv){
 		}else if(argv[1][1] == 'd' && argc == 4){ //decompress no recursion
 			if(isFile(argv[3]) == 1){
 				fileReading(argv[3],buffer,sizeof(buffer), 4);
-				//printHT();
-				//printf("%d\n", itemCount);	
+				printHT();
+				printf("%d\n", itemCount);	
 				if(invalidDirectory == 0){
-					if(isFile(argv[2]) == 1 && strlen(argv[2]) > 4 && strcmp(argv[2] + (strlen(argv[2]) - 4), ".hcz") == 0){
+					if(isFile(argv[2]) == 1){
 						fileReading(argv[2], buffer, sizeof(buffer), 2);
 					}else{
-						printf("Fatal Error: Not a compressed file (must have .hcz extension)\n");
+						printf("Fatal Error: Not a file\n");
 					}
 				}
 			}else{
@@ -194,11 +224,6 @@ int main(int argc, char** argv){
 	if(escapeseq != NULL){
 		free(escapeseq);
 	}
-
-	if(argv[2][1] == 'd' &&compressionCount == 0) {
-        printf("Warning: Directory contains no decompressable files");
-    }
-
 	return 0;
 }
 	
@@ -224,33 +249,32 @@ void directoryTraverse(char* path, int recursive, int mode){
 			continue;
 		}
 		if(curFile->d_type == DT_REG){
-			//printf("File Found: %s\n", curFile->d_name);
+			printf("File Found: %s\n", curFile->d_name);
 			char* filepath = pathCreator(path, curFile->d_name);
-			//printf("File path: %s\n", filepath);
+			printf("File path: %s\n", filepath);
 			int compressFile = 0;
-			if(strlen(curFile->d_name) > 4 && strcmp((curFile->d_name + (strlen(curFile->d_name) - 4)), ".hcz") == 0){
-				//printf("Compress file found\n");
+			if(strlen(curFile->d_name) > 7 && strcmp((curFile->d_name + (strlen(curFile->d_name) - 3)), "hcz") == 0){
+				printf("Compress file found\n");
 				compressFile = 1;
-				compressionCount++;
 			}
 			if(mode == 0 && compressFile == 0){
-				//printf("Building the HufmanCodebook\n");
+				printf("Building the HufmanCodebook\n");
 				char buffer[100] = {'\0'};
 				fileReading(filepath, buffer, sizeof(buffer), mode);
 			}else if(mode == 1 && compressFile == 0){
-				//printf("Compressing the file\n");
+				printf("Compressing the file\n");
 				char buffer[100] = {'\0'};
 				fileReading(filepath, buffer, sizeof(buffer), mode);
 			}else if(mode == 2 && compressFile){\
-				//printf("Decompressing the file\n");
+				printf("Decompressing the file\n");
 				char buffer[100] = {'\0'};
 				fileReading(filepath, buffer, sizeof(buffer), mode);
 			}
 			free(filepath);
 		}else if(curFile->d_type == DT_DIR && recursive){
-			//printf("Directory Found: %s\n", curFile->d_name);
+			printf("Directory Found: %s\n", curFile->d_name);
 			char* directorypath = pathCreator(path, curFile->d_name);
-			//printf("Directory Location: %s\n", directorypath);
+			printf("Directory Location: %s\n", directorypath);
 			directoryTraverse(directorypath, recursive, mode);
 		}else{
 			
@@ -289,11 +313,6 @@ int isFile(char* path){
 */
 void fileReading(char* path, char* buffer, int bufferSize, int mode){ 
 	int fd = open(path, O_RDONLY);
-	if(fd == -1){
-		printf("Fatal Error: File does not exist\n");
-		invalidDirectory = 1;
-		return; 
-	}
 	int fw = -2;
 	char* filename = NULL;
 	if(mode == 1){
@@ -302,25 +321,25 @@ void fileReading(char* path, char* buffer, int bufferSize, int mode){
 		memcpy(filename, path, strlen(path));
 		strcat(filename, ".hcz");
 		fw = open(filename, O_WRONLY | O_TRUNC | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
-		//printf("filename:%s\n", filename);
+		printf("filename:%s\n", filename);
 		free(filename);
 	}else if(mode == 2){
 		filename = (char*) malloc((strlen(path)- 3) * sizeof(char));
 		memset(filename, '\0', (strlen(path) - 3) * sizeof(char));
 		memcpy(filename, path, strlen(path) - 4);
 		fw = open(filename, O_WRONLY | O_TRUNC | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
-		//printf("filename:%s\n", filename);
+		printf("filename:%s\n", filename);
 		free(filename);
 	}
 	
-	if(fw == -1){
+	if(fd == -1 || fw == -1){
 		if(fd != -1){
 			close(fd);
 		}
 		if(fw >= 0){
 			close(fw);
 		}
-		printf("Fatal Error: File could not be created\n");
+		printf("Fatal Error: File does not exist\n");
 		invalidDirectory = 1;
 		return; 
 	}
@@ -344,7 +363,7 @@ void fileReading(char* path, char* buffer, int bufferSize, int mode){
 		for(bufferPos = 0; bufferPos < (bufferSize/sizeof(buffer[0])); ++bufferPos){
 			if(mode == 2){
 				if(buffer[bufferPos] == '\n'){
-					
+					printf("Last token processed\n");
 				}else{
 					if(wordpos >= defaultSize){
 						defaultSize = defaultSize * 2;
@@ -419,8 +438,7 @@ void fileReading(char* path, char* buffer, int bufferSize, int mode){
 						}
 					}else if(mode == 1){
 						findBitstring(word, fw);
-						char* temp = malloc(sizeof(char) * 2);
-						memset(temp, '\0', sizeof(char) * 2);
+						char* temp = malloc(sizeof(char) * 1);
 						temp[0] = buffer[bufferPos];
 						findBitstring(temp, fw);
 						free(word);
@@ -735,7 +753,7 @@ node* nodeInitialization(char* word, int whitespace, int frequency, char* bitstr
 	newNode->next = NULL;
 	newNode->prev = NULL;
 	
-	//printf("%s\n", newNode->data); 
+	printf("%s\n", newNode->data); 
 	
 	return newNode;
 }
@@ -839,7 +857,7 @@ void processTree(treeNode* root, char* bitString, int fd){
         return;
     }
 	 if(isLeaf(root)){
-        //printf("%s\t%s\n", root->data, bitString);
+        printf("%s\t%s\n", root->data, bitString);
         writeToFile(bitString, strlen(bitString), 0, fd);
         writeToFile("\t", strlen("\t"), 0, fd);
 		  writeToFile(root->data, strlen(root->data), root->whitespace, fd);
@@ -968,4 +986,101 @@ void freeTree(treeNode* root){
 		freeTree(root->right);
 	}
 	free(root);
+}
+
+int parentIndex(int pos){
+    return (pos-1) / 2;
+}
+
+int leftChildIndex(int pos){
+    return (2 * pos) + 1;
+}
+
+int rightChildIndex(int pos){
+    return (2 * pos) + 2;
+}
+
+int hasLeftChild(int pos){
+    if(leftChildIndex(pos) < heapSize){
+        return 1;
+    } else {
+        return 0;
+    }
+}
+int hasRightChild(int pos){
+    if(rightChildIndex(pos) < heapSize){
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+int hasParent(int pos){
+    if(parentIndex(pos) >= 0){
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+void swap(int pos1, int pos2){
+    heapNode temp = heap[pos1];
+    heap[pos1] = heap[pos2];
+    heap[pos2] = temp;
+}
+
+void checkHeapCapacity(){
+    if(heapSize == heapCapacity){
+        heapNode* temp = malloc(sizeof(heapNode) * heapCapacity * 2);
+        memcpy(temp, heap, heapCapacity);
+        free(heap);
+        heap = temp;
+        heapCapacity *= 2;
+    }
+}
+
+void siftUp(){
+    int index = heapSize - 1;
+    while(hasParent(index) && heap[parentIndex(index)].frequency > heap[index].frequency){
+        swap(parentIndex(index), index);
+        index = parentIndex(index);
+    }
+}
+
+void siftDown(){
+    int index = 0;
+    while(hasLeftChild(index)){
+        int lesserChild = leftChildIndex(index);
+        if(hasRightChild(index) && heap[rightChildIndex(index)].frequency < heap[leftChildIndex(index)].frequency){
+            lesserChild = rightChildIndex(index);
+        }
+        if(heap[index].frequency < heap[lesserChild].frequency){
+            break;
+        } else {
+            swap(index, lesserChild);
+        }
+        index = lesserChild;
+    }
+}
+
+void heapInsert(heapNode newNode){
+    checkHeapCapacity();
+    heap[heapSize] = newNode;
+    heapSize++;
+    siftUp();
+}
+
+heapNode heapRemove(){
+    heapNode oldRoot = heap[0];
+    heap[0] = heap[heapSize - 1];
+    heapSize--;
+    siftDown();
+    return oldRoot;
+}
+
+heapNode* heapCreateNode(int frequency, char* data){
+    heapNode* newNode = malloc(sizeof(heapNode));
+    newNode->frequency = frequency;
+    newNode->data = data;
+    return newNode;
 }

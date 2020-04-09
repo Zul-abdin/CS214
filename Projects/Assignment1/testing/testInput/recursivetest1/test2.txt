@@ -1,0 +1,7 @@
+a b c d e f a b c d a b c abc abc abc a bb ab
+ac
+ac
+an $eaxmple
+$pl
+&abble
+&!	\n
