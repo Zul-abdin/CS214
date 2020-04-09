@@ -55,6 +55,9 @@ int main() {
      *   - Use up/down arrows to move across the file
      *   - /<String> to search
      *   - Use 'q' to quit viewing the file
+     * - tail <filename>: Used to get the last few lines of a file
+     *   - <-n>: number of lines
+     *   - <-f>: follow flag, will show lines as they are appended to file
      *
      */
 
