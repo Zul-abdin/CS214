@@ -25,11 +25,13 @@ int main(int argc, char** argv){
 			}else{
 				struct sockaddr_in client;
 				socklen_t clientSize = sizeof(struct sockaddr_in);
-				int clientfd = accept(socketfd, (struct sockaddr*) &client, &clientSize);
-				if(clientfd == -1){
-					printf("Error: Client Refused to Connect\n");
-				}else{
-					printf("Client Accepted\n");
+				while(1){
+					int clientfd = accept(socketfd, (struct sockaddr*) &client, &clientSize);
+					if(clientfd == -1){
+						printf("Error: Client Refused to Connect\n");
+					}else{
+						printf("Client Accepted\n");
+					}
 				}
 			}
 		}
