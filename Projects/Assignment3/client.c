@@ -5,9 +5,10 @@
 #include <ctype.h>
 #include <unistd.h>
 #include <dirent.h>
+#include <sys/socket.h>
+#include <netdb.h>
 #include <stdlib.h>
 #include <stdio.h>
-
 
 void writeToFile(int fd, char* data);
 char* doubleStringSize(char* word, int newsize);
@@ -68,6 +69,32 @@ int main(int argc, char** argv) {
     return 0;
 }
 
+int createSocket(){
+	int temp = socket(AF_INET, SOCK_STREAM, 0);
+	if(temp < 0){
+		printf("Fatal Error: Could not open socket\n");
+		return -1;
+	}
+	return temp;
+}
+int connectToServer(int socketfd, char** serverinfo){
+	struct hostent* ip = gethostbyname(serverinfo[0]);
+	if(ip == NULL){
+		printf("Fatal Error: IP does not exist\n");
+		return -1;
+	}
+	struct sockaddr_in serverinfostruct;
+	bzero((char*)&serverinfostruct, sizeof(serverinfostruct)); 
+	serverinfostruct.sin_family = AF_INET;
+	serverinfostruct.sin_port = htons(atoi(serverinfo[1]));
+	bcopy((char*)ip->h_addr, (char*)&serverinfostruct.sin_addr.s_addr, ip->h_length);
+	if(connect(socketfd, &serverinfostruct, sizeof(serverinfostruct)) < 0){
+		printf("Error: Cannot connect\n");
+		return -1;
+	}
+	return 1;
+}
+
 int generateHash(char* seed){
 	int loop = 0;
 	int hash = 0;
@@ -76,7 +103,10 @@ int generateHash(char* seed){
 	}
 	return hash;
 }
-
+/*
+1st Element = IP
+2nd Element = Port
+*/
 char** getConfig(){
 	int fd = open("configure", O_RDONLY);
 	if(fd == -1){
