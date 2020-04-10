@@ -14,6 +14,8 @@ void writeToFile(int fd, char* data);
 char* doubleStringSize(char* word, int newsize);
 char** getConfig();
 void bufferFill(int fd, char* buffer, int bytesToRead);
+int connectToServer(int socketfd, char** serverinfo);
+int createSocket();
 
 int main(int argc, char** argv) {
     if(argc != 4 && argc != 3){
@@ -35,6 +37,11 @@ int main(int argc, char** argv) {
     		}else if(strlen(argv[1]) == 7 && strcmp(argv[1], "destroy") == 0){ //destroy
     			
     		}else if(strlen(argv[1]) == 14 && strcmp(argv[1], "currentversion") == 0){ //currentversion
+    			char** information = getConfig();
+    			if(information != NULL){
+    				int socketfd = createSocket();
+    				connectToServer(socketfd, information);
+    			}
     			
     		}else if(strlen(argv[1]) == 7 && strcmp(argv[1], "history") == 0){ //history
     			
@@ -70,12 +77,12 @@ int main(int argc, char** argv) {
 }
 
 int createSocket(){
-	int temp = socket(AF_INET, SOCK_STREAM, 0);
-	if(temp < 0){
+	int socketfd = socket(AF_INET, SOCK_STREAM, 0);
+	if(socketfd < 0){
 		printf("Fatal Error: Could not open socket\n");
 		return -1;
 	}
-	return temp;
+	return socketfd;
 }
 int connectToServer(int socketfd, char** serverinfo){
 	struct hostent* ip = gethostbyname(serverinfo[0]);
@@ -88,7 +95,7 @@ int connectToServer(int socketfd, char** serverinfo){
 	serverinfostruct.sin_family = AF_INET;
 	serverinfostruct.sin_port = htons(atoi(serverinfo[1]));
 	bcopy((char*)ip->h_addr, (char*)&serverinfostruct.sin_addr.s_addr, ip->h_length);
-	if(connect(socketfd, &serverinfostruct, sizeof(serverinfostruct)) < 0){
+	if(connect(socketfd, (struct sockaddr*)&serverinfostruct, sizeof(serverinfostruct)) < 0){
 		printf("Error: Cannot connect\n");
 		return -1;
 	}
@@ -110,6 +117,7 @@ int generateHash(char* seed){
 char** getConfig(){
 	int fd = open("configure", O_RDONLY);
 	if(fd == -1){
+		printf("Fatal Error: Configure file does not exist\n");
 		return NULL;
 	}
 	char buffer[25];
