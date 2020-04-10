@@ -7,6 +7,7 @@
 #include <dirent.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <time.h>
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -95,11 +96,15 @@ int connectToServer(int socketfd, char** serverinfo){
 	serverinfostruct.sin_family = AF_INET;
 	serverinfostruct.sin_port = htons(atoi(serverinfo[1]));
 	bcopy((char*)ip->h_addr, (char*)&serverinfostruct.sin_addr.s_addr, ip->h_length);
-	if(connect(socketfd, (struct sockaddr*)&serverinfostruct, sizeof(serverinfostruct)) < 0){
-		printf("Error: Cannot connect\n");
-		return -1;
+	while(1){
+		if(connect(socketfd, (struct sockaddr*)&serverinfostruct, sizeof(serverinfostruct)) < 0){
+			printf("Error: Cannot connect to server, retrying\n");
+			sleep(3);
+		}else{
+			return 1;
+		}
 	}
-	return 1;
+	return -1;
 }
 
 int generateHash(char* seed){
