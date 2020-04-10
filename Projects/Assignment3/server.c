@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+int setupServer(int socketfd, int port);
 
 int main(int argc, char** argv){
 	if(argc != 2){
