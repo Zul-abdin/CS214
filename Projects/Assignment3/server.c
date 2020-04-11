@@ -7,6 +7,7 @@
 #include <dirent.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <errno.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -18,7 +19,7 @@ typedef struct _fileNode_{
 	struct _fileNode_* prev;
 }fileNode;
 
-
+void sighandler(int sig);
 int setupServer(int socketfd, int port);
 void unloadMemory();
 void commandParser(int clientfd);
@@ -30,10 +31,14 @@ void writeToFile(int fd, char* data);
 void createProject(char* directoryName, int clientfd);
 void readNbytes(int fd, int length,char* mode ,char* placeholder);
 void createProject(char* directoryName, int clientfd);
-void directoryTraverse(char* path, int mode);
-void createManifest(int fd);
+void directoryTraverse(char* path, int mode, int fd);
+void createManifest(int fd, char* directorypath);
+char* pathCreator(char* path, char* name);
+void sendFile(int clientfd, char* fileName);
+
 
 int main(int argc, char** argv){
+	signal(SIGINT, sighandler);
 	atexit(unloadMemory);
 	if(argc != 2){
 		printf("Fatal Error: invalid number of arguments\n");
@@ -45,6 +50,7 @@ int main(int argc, char** argv){
 		}else{
 			if(setupServer(socketfd, atoi(argv[1])) == -1){
 				printf("Fatal Error: Could not bind the server socket to the ip and port\n");
+				printf("Error code: %d\n", errno);
 			}else{
 				struct sockaddr_in client;
 				socklen_t clientSize = sizeof(struct sockaddr_in);
@@ -56,6 +62,7 @@ int main(int argc, char** argv){
 						printf("Successfully: Accepted Connection\n");
 						commandParser(clientfd);
 					}
+					close(clientfd);
 				}
 			}
 		}
@@ -85,8 +92,10 @@ void commandParser(int clientfd){
 					mode = token;
 					printf("%s\n", mode);
 				}else if(strcmp(mode, "create") == 0){
-					readNbytes(clientfd, atoi(token), mode, NULL);
+					printf("Reading the filename\n");
+					fileLength = atoi(token);
 					free(token);
+					readNbytes(clientfd, fileLength, mode, NULL);
 					break;	
 				}else if(strcmp(mode, "sendFile") == 0){
 					if(numOfFiles == 0){
@@ -123,7 +132,6 @@ void commandParser(int clientfd){
 			}
 		}
 	}while(buffer[0] != '\0' && read != 0);
-	close(clientfd);
 }
 
 void readNbytes(int fd, int length, char* mode, char* placeholder){
@@ -151,34 +159,59 @@ void readNbytes(int fd, int length, char* mode, char* placeholder){
 		}
 	}while(buffer[0] != '\0' && read != 0);
 	if(strcmp("create", mode) == 0){
+		printf("Sucessfully read the filename: %s\n", token);
 		createProject(token, fd);
 		free(token);
 	}
 }
 
 void createProject(char* directoryName, int clientfd){
+	printf("Attempting to create the directory\n");
 	int success = makeDirectory(directoryName);
 	if(success){
-		char* manifest = malloc(sizeof(char) * strlen(directoryName) + 3 + strlen("/manifest"));
-		memset(manifest, '\0', sizeof(char) * strlen(directoryName) + 3 + strlen("/manifest"));
+		char* manifest = malloc(sizeof(char) * strlen(directoryName) + 3 + strlen("/Manifest"));
+		memset(manifest, '\0', sizeof(char) * strlen(directoryName) + 3 + strlen("/Manifest"));
 		manifest[0] = '.';
 		manifest[1] = '/';
 		memcpy(manifest + 2, directoryName, strlen(directoryName));
-		strcat(manifest, "/manifest");
+		strcat(manifest, "/Manifest");
 		int fd = open(manifest, O_WRONLY | O_TRUNC | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
-		createManifest(fd);
+		createManifest(fd, directoryName);
 		close(fd);
+		sendFile(clientfd, manifest);
 		free(manifest);
 	}else{
+		printf("Directory Failed to Create: Sending Error to Client\n");
 		//SEND ERROR TO CLIENT
 	}
 }
-void createManifest(int fd){
+
+void sendFile(int clientfd, char* fileName){
+	int filefd = open(fileName, O_RDONLY);
+	int read = 0;
+	if(filefd == -1){
+		printf("Fatal Error: Could not send file because file did not exit\n");
+		return;
+	}
+	char buffer[101] = {'\0'}; // Buffer is sized to 101 because we need a null terminated char array for writeToFile method since it performs a strlen
+	do{
+		read = bufferFill(filefd, buffer, (sizeof(buffer) - 1)); 
+		writeToFile(clientfd, buffer);
+	}while(buffer[0] != '\0' && read != 0);
+	close(filefd);
+}
+
+
+void createManifest(int fd, char* directorypath){
 	writeToFile(fd, "1");
 	writeToFile(fd, "\n");
-	writeToFile
+	directoryTraverse(directorypath, 0, fd);
 }
-void directoryTraverse(char* path, int mode){ 
+
+/*
+Mode 0: Traverse through and add to manifest (the fd)
+*/
+void directoryTraverse(char* path, int mode, int fd){ 
 	DIR* dirPath = opendir(path);
 	if(!dirPath){
 		printf("Fatal Error: Directory path does not exist!\n");
@@ -191,14 +224,20 @@ void directoryTraverse(char* path, int mode){
 			continue;
 		}
 		if(curFile->d_type == DT_REG){
-			//printf("File Found: %s\n", curFile->d_name);
+			printf("File Found: %s\n", curFile->d_name);
 			char* filepath = pathCreator(path, curFile->d_name);
-			//printf("File path: %s\n", filepath);
-			
+			printf("File path: %s\n", filepath);
+			if(strcmp(curFile->d_name, "Manifest") != 0 && mode == 0){
+				writeToFile(fd, "1 "); //File version number
+				writeToFile(fd, filepath); //Path to file
+				writeToFile(fd, " "); //Delimiter
+				writeToFile(fd, "HASHCODE"); //HashCode
+				writeToFile(fd, "\n"); //Newline to indicate this file is inserted in the manifest
+			}
 			free(filepath);
 		}else if(curFile->d_type == DT_DIR){
 			char* directorypath = pathCreator(path, curFile->d_name);
-			directoryTraverse(directorypath, mode);
+			directoryTraverse(directorypath, mode, fd);
 		}else{
 			
 		}
@@ -206,6 +245,16 @@ void directoryTraverse(char* path, int mode){
 	}
 	closedir(dirPath);
 }
+
+char* pathCreator(char* path, char* name){
+	char* newpath = (char *) malloc(sizeof(char) * (strlen(path) + strlen(name) + 2));
+	memcpy(newpath, path, strlen(path));
+	newpath[strlen(path)] = '/';
+	memcpy((newpath + strlen(path) + 1), name, (strlen(name)));
+	newpath[strlen(name) + strlen(path) + 1] = '\0';
+	return newpath;
+}
+
 
 int makeDirectory(char* directoryName){
 	int success = mkdir(directoryName, S_IRWXU);
@@ -274,6 +323,10 @@ int setupServer(int socketfd, int port){
 		listen(socketfd, 10);
 		return 1;
 	}
+}
+
+void sighandler(int sig){
+	exit(0);
 }
 
 void unloadMemory(){

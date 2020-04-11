@@ -43,7 +43,15 @@ int main(int argc, char** argv) {
 					writeToFile(socketfd, str);
 					writeToFile(socketfd, "$");
 					writeToFile(socketfd, argv[2]);
-					
+					char buffer[100] = {'\0'};
+					printf("Waiting for server response\n");
+					sleep(20);
+					printf("Stalled\n");
+					int read = bufferFill(socketfd, buffer, sizeof(buffer));
+					while(read == 0){
+						bufferFill(socketfd, buffer, sizeof(buffer));
+					}
+					printf("%s\n", buffer);
 				}else{
 				
 				}
@@ -96,15 +104,11 @@ int setupConnection(){
    	int socketfd = createSocket();
    	if(socketfd != -1){
 	  		connectToServer(socketfd, information);
-	  		free(information[0]);
-	  		free(information[1]);
-	  		free(information);
-	  		return socketfd;
-	  	}else{
-		  	free(information[0]);
-		  	free(information[1]);
-		  	free(information);
 	  	}
+		free(information[0]);
+		free(information[1]);
+		free(information);
+	  	return socketfd;
    }
    return 0;
 }
@@ -117,6 +121,7 @@ int createSocket(){
 	}
 	return socketfd;
 }
+
 int connectToServer(int socketfd, char** serverinfo){
 	struct hostent* ip = gethostbyname(serverinfo[0]);
 	if(ip == NULL){
