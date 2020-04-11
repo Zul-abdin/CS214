@@ -14,9 +14,10 @@
 void writeToFile(int fd, char* data);
 char* doubleStringSize(char* word, int newsize);
 char** getConfig();
-void bufferFill(int fd, char* buffer, int bytesToRead);
+int bufferFill(int fd, char* buffer, int bytesToRead);
 int connectToServer(int socketfd, char** serverinfo);
 int createSocket();
+int setupConnection();
 
 int main(int argc, char** argv) {
     if(argc != 4 && argc != 3){
@@ -34,16 +35,27 @@ int main(int argc, char** argv) {
     		}else if(strlen(argv[1]) == 4 && strcmp(argv[1], "push") == 0){ //push
     			
     		}else if(strlen(argv[1]) == 6 && strcmp(argv[1], "create") == 0){ //create
-    			
+				int socketfd = setupConnection();
+				if(socketfd > 0){
+					writeToFile(socketfd, "create$");
+					char str[3];
+					sprintf(str, "%d", strlen(argv[2]));
+					writeToFile(socketfd, str);
+					writeToFile(socketfd, "$");
+					writeToFile(socketfd, argv[2]);
+					
+				}else{
+				
+				}
     		}else if(strlen(argv[1]) == 7 && strcmp(argv[1], "destroy") == 0){ //destroy
     			
     		}else if(strlen(argv[1]) == 14 && strcmp(argv[1], "currentversion") == 0){ //currentversion
-    			char** information = getConfig();
-    			if(information != NULL){
-    				int socketfd = createSocket();
-    				connectToServer(socketfd, information);
-    			}
-    			
+				int socketfd = setupConnection();
+				if(socketfd > 0){
+					
+				}else{
+				
+				}
     		}else if(strlen(argv[1]) == 7 && strcmp(argv[1], "history") == 0){ //history
     			
     		}else{
@@ -51,7 +63,7 @@ int main(int argc, char** argv) {
     		}
     		
     	}else{
-    		if(strlen(argv[1]) == 9 && strcmp(argv[1], "configure") == 0){ //Configure
+    		if(strlen(argv[1]) == 9 && strcmp(argv[1], "configure") == 0){ //configure
     			int fd = open("configure", O_WRONLY | O_TRUNC | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
     			if(fd == -1){
     				printf("Fatal Error: Could not create the configure file\n");
@@ -62,6 +74,7 @@ int main(int argc, char** argv) {
     			writeToFile(fd, argv[3]);
     			writeToFile(fd, "\n");
     			close(fd);
+    			printf("Sucessfully created Configure file in current directory\n");
     			
     		}else if(strlen(argv[1]) == 3 && strcmp(argv[1], "add") == 0){ //Add
     		
@@ -75,6 +88,25 @@ int main(int argc, char** argv) {
     	}
     }
     return 0;
+}
+
+int setupConnection(){
+	char** information = getConfig();
+	if(information != NULL){
+   	int socketfd = createSocket();
+   	if(socketfd != -1){
+	  		connectToServer(socketfd, information);
+	  		free(information[0]);
+	  		free(information[1]);
+	  		free(information);
+	  		return socketfd;
+	  	}else{
+		  	free(information[0]);
+		  	free(information[1]);
+		  	free(information);
+	  	}
+   }
+   return 0;
 }
 
 int createSocket(){
@@ -101,6 +133,7 @@ int connectToServer(int socketfd, char** serverinfo){
 			printf("Error: Cannot connect to server, retrying\n");
 			sleep(3);
 		}else{
+			printf("Successful Connection to Server\n");
 			return 1;
 		}
 	}
@@ -122,9 +155,10 @@ int generateHash(char* seed){
 char** getConfig(){
 	int fd = open("configure", O_RDONLY);
 	if(fd == -1){
-		printf("Fatal Error: Configure file does not exist\n");
+		printf("Fatal Error: Configure file is missing, please call configure before running\n");
 		return NULL;
 	}
+	int read = 0;
 	char buffer[25];
 	int bufferPos = 0;
 	int tokenpos = 0;
@@ -135,7 +169,7 @@ char** getConfig(){
 	memset(information, '\0', sizeof(char*) * 2);
 	int finished = 0;
 	do{
-		bufferFill(fd, buffer, sizeof(buffer));
+		read = bufferFill(fd, buffer, sizeof(buffer));
 		for(bufferPos = 0; bufferPos < (sizeof(buffer) / sizeof(buffer[0])); ++bufferPos){
 			if(buffer[bufferPos] == ' '){
 				information[0] = token;
@@ -156,7 +190,7 @@ char** getConfig(){
 				tokenpos++;
 			}
 		}
-	}while(buffer[0] != '\0' && finished == 0);
+	}while((buffer[0] != '\0' && finished == 0) && read != 0);
 	return information;
 }
 
@@ -168,7 +202,7 @@ char* doubleStringSize(char* word, int newsize){
 	return expanded;
 }
 
-void bufferFill(int fd, char* buffer, int bytesToRead){
+int bufferFill(int fd, char* buffer, int bytesToRead){
     int position = 0;
     int bytesRead = 0;
     int status = 0;
@@ -176,14 +210,14 @@ void bufferFill(int fd, char* buffer, int bytesToRead){
     do{
         status = read(fd, (buffer + bytesRead), bytesToRead-bytesRead);
         if(status == 0){
-            //printf("Finished reading the File or Buffer is filled\n");
-            break;
+       		break;
         }else if(status == -1){
             printf("Warning: Error when reading the file reading\n");
-            return;
+            return bytesRead;
         }
         bytesRead += status;
     }while(bytesRead < bytesToRead);
+    	return bytesRead;
 }
 
 
