@@ -144,10 +144,14 @@ void readNbytes(int fd, int length, char* mode, char* placeholder){
 	int bufferPos = 0;
 
 	do{
-		if(length > sizeof(buffer)){
-			read = bufferFill(fd, buffer, sizeof(buffer));
+		if(length == 0){
+			break;
 		}else{
-			read = bufferFill(fd, buffer, length);
+			if(length > sizeof(buffer)){
+				read = bufferFill(fd, buffer, sizeof(buffer));
+			}else{
+				read = bufferFill(fd, buffer, length);
+			}
 		}
 		for(bufferPos = 0; bufferPos < read; ++bufferPos){
 			if(tokenpos >= defaultSize){
@@ -157,6 +161,7 @@ void readNbytes(int fd, int length, char* mode, char* placeholder){
 			token[tokenpos] = buffer[bufferPos];
 			tokenpos++;
 		}
+		length = length - read;
 	}while(buffer[0] != '\0' && read != 0);
 	if(strcmp("create", mode) == 0){
 		printf("Sucessfully read the filename: %s\n", token);
@@ -178,10 +183,12 @@ void createProject(char* directoryName, int clientfd){
 		int fd = open(manifest, O_WRONLY | O_TRUNC | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
 		createManifest(fd, directoryName);
 		close(fd);
+		printf("Sending the Manifest to Client\n");
 		sendFile(clientfd, manifest);
 		free(manifest);
 	}else{
 		printf("Directory Failed to Create: Sending Error to Client\n");
+		writeToFile(clientfd, "ERROR\n");
 		//SEND ERROR TO CLIENT
 	}
 }
@@ -196,8 +203,10 @@ void sendFile(int clientfd, char* fileName){
 	char buffer[101] = {'\0'}; // Buffer is sized to 101 because we need a null terminated char array for writeToFile method since it performs a strlen
 	do{
 		read = bufferFill(filefd, buffer, (sizeof(buffer) - 1)); 
+		printf("The buffer has %s\n", buffer);
 		writeToFile(clientfd, buffer);
 	}while(buffer[0] != '\0' && read != 0);
+	printf("Finished sending file: %s to client\n", fileName);
 	close(filefd);
 }
 
@@ -275,7 +284,6 @@ void writeToFile(int fd, char* data){
 		status = write(fd, (data + bytesWritten), (bytesToWrite - bytesWritten));
 		if(status == -1){
 			printf("Warning: write encountered an error\n");
-			close(fd);
 			return;
 		}
 		bytesWritten += status;

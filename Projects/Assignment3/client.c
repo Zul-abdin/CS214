@@ -45,12 +45,8 @@ int main(int argc, char** argv) {
 					writeToFile(socketfd, argv[2]);
 					char buffer[100] = {'\0'};
 					printf("Waiting for server response\n");
-					sleep(20);
-					printf("Stalled\n");
 					int read = bufferFill(socketfd, buffer, sizeof(buffer));
-					while(read == 0){
-						bufferFill(socketfd, buffer, sizeof(buffer));
-					}
+					close(socketfd);
 					printf("%s\n", buffer);
 				}else{
 				
