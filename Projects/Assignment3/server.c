@@ -14,7 +14,8 @@
 
 typedef struct _fileNode_{
 	char* filename;
-	int filelength;
+	long long filelength;
+	char* filepath;
 	struct _fileNode_* next;
 	struct _fileNode_* prev;
 }fileNode;
@@ -22,20 +23,23 @@ typedef struct _fileNode_{
 void sighandler(int sig);
 int setupServer(int socketfd, int port);
 void unloadMemory();
-void commandParser(int clientfd);
+void metadataParser(int clientfd);
 int bufferFill(int fd, char* buffer, int bytesToRead);
 void commands(int clientfd);
 char* doubleStringSize(char* word, int newsize);
 int makeDirectory(char* directoryName);
 void writeToFile(int fd, char* data);
 void createProject(char* directoryName, int clientfd);
-void readNbytes(int fd, int length,char* mode ,char* placeholder);
+void readNbytes(int fd, int length,char* mode ,char** placeholder);
 void createProject(char* directoryName, int clientfd);
 void directoryTraverse(char* path, int mode, int fd);
 void createManifest(int fd, char* directorypath);
 char* pathCreator(char* path, char* name);
 void sendFile(int clientfd, char* fileName);
-
+void calculateFileBytes(char* fileName, fileNode* file);
+void setupMetadata(int clientfd, fileNode* files, int numOfFiles);
+void sendToClient(int clientfd, fileNode* files, int numOfFiles);
+fileNode* createFileNode(char* filepath, char* filename);
 
 int main(int argc, char** argv){
 	signal(SIGINT, sighandler);
@@ -60,7 +64,7 @@ int main(int argc, char** argv){
 						printf("Error: Refused Connection\n");
 					}else{
 						printf("Successfully: Accepted Connection\n");
-						commandParser(clientfd);
+						metadataParser(clientfd);
 					}
 					close(clientfd);
 				}
@@ -70,7 +74,7 @@ int main(int argc, char** argv){
 	return 0;
 }
 
-void commandParser(int clientfd){
+void metadataParser(int clientfd){
 	char buffer[1] = {'\0'}; 
 	int defaultSize = 15;
 	char* token = malloc(sizeof(char) * (defaultSize + 1));
@@ -86,55 +90,60 @@ void commandParser(int clientfd){
 	char* mode = NULL;
 	do{
 		read = bufferFill(clientfd, buffer, sizeof(buffer));
-		for(bufferPos = 0; bufferPos < (sizeof(buffer) / sizeof(buffer[0])); ++bufferPos){
-			if(buffer[bufferPos] == '$'){
-				if(mode == NULL){
-					mode = token;
-					printf("%s\n", mode);
-				}else if(strcmp(mode, "create") == 0){
-					printf("Reading the filename\n");
-					fileLength = atoi(token);
+		if(buffer[0] == '$'){
+			if(mode == NULL){
+				mode = token;
+				printf("%s\n", mode);
+			}else if(strcmp(mode, "create") == 0){
+				printf("Reading the filename\n");
+				fileLength = atoi(token);
+				free(token);
+				char* temp = NULL;
+				readNbytes(clientfd, fileLength, NULL, &temp);
+				createProject(temp, clientfd);
+				free(temp);
+				break;	
+			}else if(strcmp(mode, "sendFile") == 0){
+				if(numOfFiles == 0){
+					numOfFiles = atoi(token);
+					listOfFiles = (fileNode*) malloc(sizeof(fileNode) * numOfFiles);
 					free(token);
-					readNbytes(clientfd, fileLength, mode, NULL);
-					break;	
-				}else if(strcmp(mode, "sendFile") == 0){
-					if(numOfFiles == 0){
-						numOfFiles = atoi(token);
-						listOfFiles = (fileNode*) malloc(sizeof(fileNode) * numOfFiles);
-						free(token);
-					}else if(fileName == 0){
-						char* temp = NULL;
-						readNbytes(clientfd, atoi(token), mode, temp);
-						listOfFiles[filesRead].filename = temp;
-						free(token);
-						fileName = 1;
-					}else{
-						fileName = 0;
-						listOfFiles[filesRead].filelength = atoi(token);
-						filesRead++;
-						free(token);
-					}
-					if(numOfFiles == filesRead){
+				}else if(fileName == 0){
+					char* temp = NULL;
+					readNbytes(clientfd, atoi(token), NULL, &temp);
+					listOfFiles[filesRead].filename = temp;
+					free(token);
+					fileName = 1;
+				}else{
+					fileName = 0;
+					listOfFiles[filesRead].filelength = (long long) atoi(token);
+					filesRead++;
+					free(token);
+				}
+				if(numOfFiles == filesRead){
 						//LOOP THROUGH LINKED LIST OF FILE NODES and create and scan.
-					}
 				}
-				defaultSize = 10;
-				tokenpos = 0;
-				token = (char*) malloc(sizeof(char) * (defaultSize + 1));
-				memset(token, '\0', sizeof(char) * (defaultSize + 1));
-			}else{
-				if(tokenpos >= defaultSize){
-					defaultSize = defaultSize * 2;
-					token = doubleStringSize(token, defaultSize);
-				}
-				token[tokenpos] = buffer[bufferPos];
-				tokenpos++;
 			}
+			defaultSize = 10;
+			tokenpos = 0;
+			token = (char*) malloc(sizeof(char) * (defaultSize + 1));
+			memset(token, '\0', sizeof(char) * (defaultSize + 1));
+		}else{
+			if(tokenpos >= defaultSize){
+				defaultSize = defaultSize * 2;
+				token = doubleStringSize(token, defaultSize);
+			}
+			token[tokenpos] = buffer[0];
+			tokenpos++;
 		}
 	}while(buffer[0] != '\0' && read != 0);
 }
 
-void readNbytes(int fd, int length, char* mode, char* placeholder){
+/*
+	If Mode is NULL, it will place the token inside the placeholder
+
+*/
+void readNbytes(int fd, int length, char* mode, char** placeholder){
 	char buffer[100] = {'\0'};
 	int defaultSize = 15;
 	char* token = malloc(sizeof(char) * (defaultSize + 1));
@@ -153,20 +162,20 @@ void readNbytes(int fd, int length, char* mode, char* placeholder){
 				read = bufferFill(fd, buffer, length);
 			}
 		}
-		for(bufferPos = 0; bufferPos < read; ++bufferPos){
-			if(tokenpos >= defaultSize){
-				defaultSize = defaultSize * 2;
-				token = doubleStringSize(token, defaultSize);
+		if(mode == NULL){
+			for(bufferPos = 0; bufferPos < read; ++bufferPos){
+				if(tokenpos >= defaultSize){
+					defaultSize = defaultSize * 2;
+					token = doubleStringSize(token, defaultSize);
+				}
+				token[tokenpos] = buffer[bufferPos];
+				tokenpos++;
 			}
-			token[tokenpos] = buffer[bufferPos];
-			tokenpos++;
 		}
 		length = length - read;
 	}while(buffer[0] != '\0' && read != 0);
-	if(strcmp("create", mode) == 0){
-		printf("Sucessfully read the filename: %s\n", token);
-		createProject(token, fd);
-		free(token);
+	if(mode == NULL){
+		(*placeholder) = token;
 	}
 }
 
@@ -184,17 +193,69 @@ void createProject(char* directoryName, int clientfd){
 		createManifest(fd, directoryName);
 		close(fd);
 		printf("Sending the Manifest to Client\n");
-		sendFile(clientfd, manifest);
+		writeToFile(clientfd, "SUCCESS");
+		fileNode* manifestNode = createFileNode(manifest, "Manifest");
+		sendToClient(clientfd, manifestNode, 1);
 		free(manifest);
 	}else{
 		printf("Directory Failed to Create: Sending Error to Client\n");
-		writeToFile(clientfd, "ERROR\n");
+		writeToFile(clientfd, "FAILURE");
 		//SEND ERROR TO CLIENT
 	}
 }
 
-void sendFile(int clientfd, char* fileName){
-	int filefd = open(fileName, O_RDONLY);
+void calculateFileBytes(char* fileName, fileNode* file){
+	struct stat fileinfo;
+	bzero((char*)&fileinfo, sizeof(struct stat));
+	int success = stat(fileName, &fileinfo);
+	if(success == -1){
+		printf("Error: File not found to get metadata\n");
+	}else{
+		file->filelength = (long long) fileinfo.st_size;
+	}
+}
+
+fileNode* createFileNode(char* filepath, char* filename){
+	fileNode* newNode = (fileNode*) malloc(sizeof(fileNode) * 1);
+	newNode->filepath = filepath;
+	newNode->filename = filename;
+	calculateFileBytes(filepath, newNode);
+	newNode->next = NULL;
+	newNode->prev = NULL;
+}
+
+void setupMetadata(int clientfd, fileNode* files, int numOfFiles){
+	fileNode* file = files;
+	while(file != NULL){
+		char str[3] = {'\0'};
+		sprintf(str, "%d", numOfFiles);
+		writeToFile(clientfd, str);
+		writeToFile(clientfd, "$");
+		memset(str, '\0', sizeof(char) * 3);
+		sprintf(str, "%d", strlen(file->filepath));
+		writeToFile(clientfd, str);
+		writeToFile(clientfd, "$");
+		writeToFile(clientfd, file->filepath);
+		char filebytes[256] = {'\0'};
+		sprintf(filebytes, "%lld", file->filelength);
+		writeToFile(clientfd, filebytes);
+		writeToFile(clientfd, "$");
+		file = file->next;
+	}
+}
+
+void sendToClient(int clientfd, fileNode* files, int numOfFiles){
+	writeToFile(clientfd, "sendFile$");
+	setupMetadata(clientfd, files, numOfFiles);
+	fileNode* file = files;
+	while(file != NULL){
+		sendFile(clientfd, file->filepath);
+		file = file->next;
+	}
+}
+
+void sendFile(int clientfd, char* filepath){
+	int filefd = open(filepath, O_RDONLY);
 	int read = 0;
 	if(filefd == -1){
 		printf("Fatal Error: Could not send file because file did not exit\n");
@@ -206,7 +267,7 @@ void sendFile(int clientfd, char* fileName){
 		printf("The buffer has %s\n", buffer);
 		writeToFile(clientfd, buffer);
 	}while(buffer[0] != '\0' && read != 0);
-	printf("Finished sending file: %s to client\n", fileName);
+	printf("Finished sending file: %s to client\n", filepath);
 	close(filefd);
 }
 

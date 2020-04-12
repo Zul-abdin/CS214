@@ -11,6 +11,14 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+typedef struct _fileNode_{
+	char* filename;
+	char* filepath;
+	long long filelength;
+	struct _fileNode_* next;
+	struct _fileNode_* prev;
+}fileNode;
+
 void writeToFile(int fd, char* data);
 char* doubleStringSize(char* word, int newsize);
 char** getConfig();
@@ -18,6 +26,13 @@ int bufferFill(int fd, char* buffer, int bytesToRead);
 int connectToServer(int socketfd, char** serverinfo);
 int createSocket();
 int setupConnection();
+void metadataParser(int clientfd);
+void readNbytes(int fd, int length, char* mode, char** placeholder);
+void writeToFileFromSocket(int socketfd, fileNode* files);
+void writeToSocketFromFile(int clientfd, char* fileName);
+void createProject(char* directoryName, int socketfd);
+
+fileNode* listOfFiles;
 
 int main(int argc, char** argv) {
     if(argc != 4 && argc != 3){
@@ -38,16 +53,21 @@ int main(int argc, char** argv) {
 				int socketfd = setupConnection();
 				if(socketfd > 0){
 					writeToFile(socketfd, "create$");
-					char str[3];
+					char str[3] = {'\0'};
 					sprintf(str, "%d", strlen(argv[2]));
 					writeToFile(socketfd, str);
 					writeToFile(socketfd, "$");
 					writeToFile(socketfd, argv[2]);
-					char buffer[100] = {'\0'};
-					printf("Waiting for server response\n");
-					int read = bufferFill(socketfd, buffer, sizeof(buffer));
+					char* temp = NULL;
+					readNbytes(socketfd, strlen("FAILURE"), NULL, &temp);
+					if(strcmp(temp, "SUCCESS") == 0){
+						printf("Server sucessfully created the project, recieving the Manifest\n");
+						metadataParser(socketfd);
+						createProject(argv[2], socketfd);
+					}else if(strcmp(temp , "FAILURE") == 0){
+						printf("Server failed to created the project\n");
+					}
 					close(socketfd);
-					printf("%s\n", buffer);
 				}else{
 				
 				}
@@ -92,6 +112,184 @@ int main(int argc, char** argv) {
     	}
     }
     return 0;
+}
+
+void metadataParser(int clientfd){
+	char buffer[1] = {'\0'}; 
+	int defaultSize = 15;
+	char* token = malloc(sizeof(char) * (defaultSize + 1));
+	memset(token, '\0', sizeof(char) * (defaultSize + 1));
+	int read = 0;
+	int bufferPos = 0;
+	int tokenpos = 0;
+	int numOfFiles = 0; //Could change this to array and have each index store the fileLength 
+	int fileLength = 0;
+	int filesRead = 0;
+	int fileName = 0; //Could change this to a linked list of file names or an array of file names
+	listOfFiles = NULL; 
+	char* mode = NULL;
+	do{
+		read = bufferFill(clientfd, buffer, sizeof(buffer));
+		if(buffer[0] == '$'){
+			if(mode == NULL){
+				mode = token;
+				printf("%s\n", mode);
+			}else if(strcmp(mode, "ERROR") == 0){
+				break;	
+			}else if(strcmp(mode, "sendFile") == 0){
+				if(numOfFiles == 0){
+					numOfFiles = atoi(token);
+					listOfFiles = calloc(numOfFiles, sizeof(fileNode));
+					free(token);
+				}else if(fileName == 0){
+					char* temp = NULL;
+					fileLength = atoi(token);
+					readNbytes(clientfd, fileLength, NULL, &temp);
+					listOfFiles[filesRead].filepath = temp;
+					char* temp1 = (char*)basename(temp);
+					printf("The basename is %s and %d\n", temp1, strlen(temp1));
+					
+					char* name = (char*) malloc(sizeof(char) * strlen(temp1) + 1);
+					memset(name, '\0', sizeof(char) * strlen(temp1) + 1);
+					memcpy(name, temp1, strlen(temp1));
+					listOfFiles[filesRead].filename = name;
+					free(token);
+					fileName = 1;
+				}else{
+					fileName = 0;
+					listOfFiles[filesRead].filelength = (long long) atoi(token);
+					filesRead++;
+					free(token);
+				}
+				if(numOfFiles == filesRead){
+					int filenumber = 0;
+					for(filenumber = 0; filenumber < numOfFiles; ++filenumber){
+						printf("File: %s\n", listOfFiles[filenumber].filename);
+					}
+					break;
+				}
+			}
+				defaultSize = 10;
+				tokenpos = 0;
+				token = (char*) malloc(sizeof(char) * (defaultSize + 1));
+				memset(token, '\0', sizeof(char) * (defaultSize + 1));
+		}else{
+			if(tokenpos >= defaultSize){
+				defaultSize = defaultSize * 2;
+				token = doubleStringSize(token, defaultSize);
+			}
+			token[tokenpos] = buffer[bufferPos];
+			tokenpos++;
+		}
+	}while(buffer[0] != '\0' && read != 0);
+}
+
+void readNbytes(int fd, int length, char* mode, char** placeholder){
+	char buffer[100] = {'\0'};
+	int defaultSize = 15;
+	char* token = malloc(sizeof(char) * (defaultSize + 1));
+	memset(token, '\0', sizeof(char) * (defaultSize + 1));
+	int tokenpos = 0;
+	int read = 0;
+	int bufferPos = 0;
+
+	do{
+		if(length == 0){
+			break;
+		}else{
+			if(length > sizeof(buffer)){
+				read = bufferFill(fd, buffer, sizeof(buffer));
+			}else{
+				read = bufferFill(fd, buffer, length);
+			}
+		}
+		if(mode == NULL){
+			for(bufferPos = 0; bufferPos < read; ++bufferPos){
+			if(tokenpos >= defaultSize){
+				defaultSize = defaultSize * 2;
+				token = doubleStringSize(token, defaultSize);
+			}
+			token[tokenpos] = buffer[bufferPos];
+			tokenpos++;
+			}
+		}
+		length = length - read;
+	}while(buffer[0] != '\0' && read != 0);
+	if(mode == NULL){
+		*placeholder = token;
+	}
+}
+
+void writeToFileFromSocket(int socketfd, fileNode* files){
+	char buffer[100] = {'\0'};
+	fileNode* file = files;
+	while(file != NULL){
+		int filelength = file->filelength;
+		int read = 0;
+		int filefd = open(file->filepath, O_WRONLY);
+		if(filefd == -1){
+			printf("Fatal Error: Could not write to File from the Socket because File did not exist\n");
+		}
+		while(filelength != 0){
+			if(filelength > sizeof(buffer)){
+				read = bufferFill(socketfd, buffer, sizeof(buffer));
+			}else{
+				read = bufferFill(socketfd, buffer, filelength);
+			}
+			printf("The buffer has %s\n", buffer);
+			writeToFile(filefd, buffer);
+			
+			filelength = filelength - read;
+		}
+		file = file->next;
+	}
+}
+
+void writeToSocketFromFile(int clientfd, char* fileName){
+	int filefd = open(fileName, O_RDONLY);
+	int read = 0;
+	if(filefd == -1){
+		printf("Fatal Error: Could not send file because file did not exist\n");
+		return;
+	}
+	char buffer[101] = {'\0'}; // Buffer is sized to 101 because we need a null terminated char array for writeToFile method since it performs a strlen
+	do{
+		read = bufferFill(filefd, buffer, (sizeof(buffer) - 1)); 
+		printf("The buffer has %s\n", buffer);
+		writeToFile(clientfd, buffer);
+	}while(buffer[0] != '\0' && read != 0);
+	printf("Finished sending file: %s to client\n", fileName);
+	close(filefd);
+}
+
+void createProject(char* directoryName, int socketfd){
+	printf("Attempting to create the directory\n");
+	int success = makeDirectory(directoryName);
+	if(success){
+		char* manifest = malloc(sizeof(char) * strlen(directoryName) + 3 + strlen("/Manifest"));
+		memset(manifest, '\0', sizeof(char) * strlen(directoryName) + 3 + strlen("/Manifest"));
+		manifest[0] = '.';
+		manifest[1] = '/';
+		memcpy(manifest + 2, directoryName, strlen(directoryName));
+		strcat(manifest, "/Manifest");
+		int fd = open(manifest, O_WRONLY | O_TRUNC | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
+		close(fd);
+		free(manifest);
+		writeToFileFromSocket(socketfd, listOfFiles);
+	}else{
+		printf("Client: Directory Failed to Create\n");
+	}
+}
+
+int makeDirectory(char* directoryName){
+	int success = mkdir(directoryName, S_IRWXU);
+	if(success == -1){
+		printf("Warning: Directory could not be created\n");
+		return 0;
+	}else{
+		printf("Directory Created\n");
+		return 1;
+	}
 }
 
 int setupConnection(){
