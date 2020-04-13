@@ -32,6 +32,7 @@ void writeToFile(int fd, char* data);
 void createProject(char* directoryName, int clientfd);
 void readNbytes(int fd, int length,char* mode ,char** placeholder);
 void createProject(char* directoryName, int clientfd);
+void getProjectVersion(char* directoryName, int clientfd);
 void directoryTraverse(char* path, int mode, int fd);
 void createManifest(int fd, char* directorypath);
 char* pathCreator(char* path, char* name);
@@ -94,15 +95,24 @@ void metadataParser(int clientfd){
 			if(mode == NULL){
 				mode = token;
 				printf("%s\n", mode);
-			}else if(strcmp(mode, "create") == 0){
-				printf("Reading the filename\n");
-				fileLength = atoi(token);
-				free(token);
-				char* temp = NULL;
-				readNbytes(clientfd, fileLength, NULL, &temp);
-				createProject(temp, clientfd);
-				free(temp);
-				break;	
+			}else if(strcmp(mode, "create") == 0) {
+                printf("Reading the filename\n");
+                fileLength = atoi(token);
+                free(token);
+                char* temp = NULL;
+                readNbytes(clientfd, fileLength, NULL, &temp);
+                createProject(temp, clientfd);
+                free(temp);
+                break;
+            }else if(strcmp(mode, "currentversion") == 0){
+                printf("Reading the filename\n");
+                fileLength = atoi(token);
+                free(token);
+                char* temp = NULL;
+                readNbytes(clientfd, fileLength, NULL, &temp);
+                getProjectVersion(temp, clientfd);
+                free(temp);
+                break;
 			}else if(strcmp(mode, "sendFile") == 0){
 				if(numOfFiles == 0){
 					numOfFiles = atoi(token);
@@ -204,6 +214,32 @@ void createProject(char* directoryName, int clientfd){
 	}
 }
 
+void getProjectVersion(char* directoryName, int clientfd) {
+    printf("Attempting to get project Version\n");
+    int fdManifest = open(strcat(directoryName, "/Manifest"), O_RDONLY);
+    char buffer[1] = {'\0'};
+    int defaultSize = 50;
+    char *token = malloc(sizeof(char) * (defaultSize + 1));
+    memset(token, '\0', sizeof(char) * (defaultSize + 1));
+    int read = 0;
+    char *line = NULL;
+    int length;
+    do {
+        read = bufferFill(fdManifest, buffer, sizeof(buffer));
+        if (buffer[0] == '\n') {
+            if (line == NULL) {
+                line = token;
+                printf("%s\n", line);
+                writeToFile(clientfd, line);
+                if(read !=0){
+                    writeToFile(clientfd, "$"); //Tells client another line is coming
+                }
+            }
+        }
+    }while (buffer[0] != '\0' && read != 0);
+    writeToFile(clientfd, "#"); //Tells client no more file lines remain
+}
+
 void calculateFileBytes(char* fileName, fileNode* file){
 	struct stat fileinfo;
 	bzero((char*)&fileinfo, sizeof(struct stat));
@@ -232,7 +268,7 @@ void setupMetadata(int clientfd, fileNode* files, int numOfFiles){
 		writeToFile(clientfd, str);
 		writeToFile(clientfd, "$");
 		memset(str, '\0', sizeof(char) * 3);
-		sprintf(str, "%d", strlen(file->filepath));
+		sprintf(str, "%lu", strlen(file->filepath));
 		writeToFile(clientfd, str);
 		writeToFile(clientfd, "$");
 		writeToFile(clientfd, file->filepath);

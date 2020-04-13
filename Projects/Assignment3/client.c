@@ -10,6 +10,7 @@
 #include <time.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <libgen.h>
 
 typedef struct _fileNode_{
 	char* filename;
@@ -31,6 +32,7 @@ void readNbytes(int fd, int length, char* mode, char** placeholder);
 void writeToFileFromSocket(int socketfd, fileNode* files);
 void writeToSocketFromFile(int clientfd, char* fileName);
 void createProject(char* directoryName, int socketfd);
+int makeDirectory(char* directoryName);
 
 fileNode* listOfFiles;
 
@@ -54,7 +56,7 @@ int main(int argc, char** argv) {
 				if(socketfd > 0){
 					writeToFile(socketfd, "create$");
 					char str[3] = {'\0'};
-					sprintf(str, "%d", strlen(argv[2]));
+					sprintf(str, "%lu", strlen(argv[2]));
 					writeToFile(socketfd, str);
 					writeToFile(socketfd, "$");
 					writeToFile(socketfd, argv[2]);
@@ -76,7 +78,19 @@ int main(int argc, char** argv) {
     		}else if(strlen(argv[1]) == 14 && strcmp(argv[1], "currentversion") == 0){ //currentversion
 				int socketfd = setupConnection();
 				if(socketfd > 0){
-					
+                    writeToFile(socketfd, "currentversion$");
+                    char str[3] = {'\0'};
+                    sprintf(str, "%lu", strlen(argv[2]));
+                    writeToFile(socketfd, str);
+                    writeToFile(socketfd, "$");
+                    writeToFile(socketfd, argv[2]);
+                    char* temp = NULL;
+                    do {
+                        readNbytes(socketfd, 50, NULL, &temp);
+                        printf("%s", temp);
+                        readNbytes(socketfd, 1, NULL, &temp);
+                    } while(strcmp(temp, "$") == 0);
+                    close(socketfd);
 				}else{
 				
 				}
@@ -147,7 +161,7 @@ void metadataParser(int clientfd){
 					readNbytes(clientfd, fileLength, NULL, &temp);
 					listOfFiles[filesRead].filepath = temp;
 					char* temp1 = (char*)basename(temp);
-					printf("The basename is %s and %d\n", temp1, strlen(temp1));
+					printf("The basename is %s and %lu\n", temp1, strlen(temp1));
 					
 					char* name = (char*) malloc(sizeof(char) * strlen(temp1) + 1);
 					memset(name, '\0', sizeof(char) * strlen(temp1) + 1);
