@@ -21,27 +21,53 @@ typedef struct _fileNode_{
 	struct _fileNode_* prev;
 }fileNode;
 
+/*
+	Clean up Methods
+*/
 void sighandler(int sig);
-int setupServer(int socketfd, int port);
 void unloadMemory();
+
+/*
+	Setup Server Methods
+*/
+int setupServer(int socketfd, int port);
+
+/*
+	File Recieving Methods:
+*/
 void metadataParser(int clientfd);
 int bufferFill(int fd, char* buffer, int bytesToRead);
-void commands(int clientfd);
-char* doubleStringSize(char* word, int newsize);
-int makeDirectory(char* directoryName);
-void writeToFile(int fd, char* data);
-void createProject(char* directoryName, int clientfd);
 void readNbytes(int fd, int length,char* mode ,char** placeholder);
-void createProject(char* directoryName, int clientfd);
-void getProjectVersion(char* directoryName, int clientfd);
-void directoryTraverse(char* path, int mode, int fd);
-void createManifest(int fd, char* directorypath);
-char* pathCreator(char* path, char* name);
+
+/*
+	File Sending Methods:
+*/
+void writeToFile(int fd, char* data);
 void sendFile(int clientfd, char* fileName);
-void calculateFileBytes(char* fileName, fileNode* file);
 void setupFileMetadata(int clientfd, fileNode* files, int numOfFiles);
 void sendFilesToClient(int clientfd, fileNode* files, int numOfFiles);
+
+/*
+	Helper Methods
+*/
+char* doubleStringSize(char* word, int newsize);
+char* pathCreator(char* path, char* name);
+int makeDirectory(char* directoryName);
+void makeNestedDirectories(char* path);
+void directoryTraverse(char* path, int mode, int fd);
+void calculateFileBytes(char* fileName, fileNode* file);
 fileNode* createFileNode(char* filepath, char* filename);
+void insertLL(fileNode* node);
+
+/*
+	Command Methods
+*/
+void createProject(char* directoryName, int clientfd);
+void getProjectVersion(char* directoryName, int clientfd);
+void createManifest(int fd, char* directorypath);
+
+fileNode* listOfFiles = NULL;
+int numOfFiles = 0;
 
 int main(int argc, char** argv){
 	signal(SIGINT, sighandler);
@@ -84,11 +110,11 @@ void metadataParser(int clientfd){
 	int read = 0;
 	int bufferPos = 0;
 	int tokenpos = 0;
-	int numOfFiles = 0; //Could change this to array and have each index store the fileLength 
 	int fileLength = 0;
 	int filesRead = 0;
 	int fileName = 0; //Could change this to a linked list of file names or an array of file names
-	fileNode* listOfFiles = NULL; 
+	listOfFiles = NULL;
+	fileNode* file = NULL;
 	char* mode = NULL;
 	do{
 		read = bufferFill(clientfd, buffer, sizeof(buffer));
@@ -96,52 +122,71 @@ void metadataParser(int clientfd){
 			if(mode == NULL){
 				mode = token;
 				printf("%s\n", mode);
+			}else if(strcmp(mode, "checkout") == 0){
+				printf("Reading the project to check out\n");
+				fileLength = atoi(token);
+				free(token);
+				char* temp = NULL;
+				readNbytes(clientfd, fileLength, NULL, &temp);
+				
+				free(temp);
 			}else if(strcmp(mode, "create") == 0) {
-                printf("Reading the filename\n");
-                fileLength = atoi(token);
-                free(token);
-                char* temp = NULL;
-                readNbytes(clientfd, fileLength, NULL, &temp);
-                createProject(temp, clientfd);
-                free(temp);
-                break;
-            }else if(strcmp(mode, "currentversion") == 0){
-                printf("Reading the filename\n");
-                fileLength = atoi(token);
-                free(token);
-                char* temp = NULL;
-                readNbytes(clientfd, fileLength, NULL, &temp);
-                getProjectVersion(temp, clientfd);
-                free(temp);
-                break;
+				printf("Reading the filename to create\n");
+				fileLength = atoi(token);
+				free(token);
+				char* temp = NULL;
+				readNbytes(clientfd, fileLength, NULL, &temp);
+				createProject(temp, clientfd);
+				free(temp);
+				break;
+         }else if(strcmp(mode, "currentversion") == 0){
+             printf("Reading the filename\n");
+             fileLength = atoi(token);
+             free(token);
+             char* temp = NULL;
+             readNbytes(clientfd, fileLength, NULL, &temp);
+             getProjectVersion(temp, clientfd);
+             free(temp);
+             break;
 			}else if(strcmp(mode, "sendFile") == 0){
 				if(numOfFiles == 0){
 					numOfFiles = atoi(token);
-					listOfFiles = (fileNode*) malloc(sizeof(fileNode) * numOfFiles);
+					
+					file = (fileNode*) malloc(sizeof(fileNode) * 1);
+					file->next = NULL;
+					file->prev = NULL;
+					
 					free(token);
 				}else if(fileName == 0){
 					char* temp = NULL;
-					readNbytes(clientfd, atoi(token), NULL, &temp);
-					listOfFiles[filesRead].filepath = temp;
+					fileLength = atoi(token);
+					readNbytes(clientfd, fileLength, NULL, &temp);
+					file->filepath = temp;
 					
-					char* temp1 = basename(temp);
-					char* name = (char*) malloc(sizeof(char) * strlen(temp1) + 1);
-					memset(name, '\0', sizeof(char) * strlen(temp1) + 1);
-					memcpy(name, temp1, strlen(temp1));
-					listOfFiles[filesRead].filename = name;
+					char* name = (char*) malloc(sizeof(char) * strlen(basename(temp)) + 1);
+					memset(name, '\0', sizeof(char) * strlen(basename(temp)) + 1);
+					memcpy(name, basename(temp), strlen(basename(temp)));
+					file->filename = name;
 					
 					free(token);
 					fileName = 1;
 				}else{
-					fileName = 0;
-					listOfFiles[filesRead].filelength = (long long) atoi(token);
+					file->filelength = (long long) atoi(token);
+					insertLL(file);
+					
+					file = (fileNode*) malloc(sizeof(fileNode) * 1);
+					file->next = NULL;
+					file->prev = NULL;
+					
 					filesRead++;
 					free(token);
+					fileName = 0;
 				}
 				if(numOfFiles == filesRead){
-					int filenumber = 0;
-					for(filenumber = 0; filenumber < numOfFiles; ++filenumber){
-						printf("File: %s\n", listOfFiles[filenumber].filename);
+					fileNode* temp = listOfFiles;
+					while(temp != NULL){
+						printf("File: %s\n", temp->filename);
+						temp = temp->next;
 					}
 					break;
 				}
@@ -162,8 +207,8 @@ void metadataParser(int clientfd){
 }
 
 /*
-	If Mode is NULL, it will place the token inside the placeholder
-	
+	Reads N bytes specified by length
+		IF MODE = NULL: creates a token and stores into placeholder
 */
 void readNbytes(int fd, int length, char* mode, char** placeholder){
 	char buffer[100] = {'\0'};
@@ -222,9 +267,15 @@ void createProject(char* directoryName, int clientfd){
 	}else{
 		printf("Directory Failed to Create: Sending Error to Client\n");
 		writeToFile(clientfd, "FAILURE");
-		//SEND ERROR TO CLIENT
 	}
 }
+
+void createManifest(int fd, char* directorypath){
+	writeToFile(fd, "1");
+	writeToFile(fd, "\n");
+	directoryTraverse(directorypath, 0, fd);
+}
+
 /*
 	The Client will recieve 
 		SUCCESS if the Manifest is found
@@ -305,26 +356,10 @@ void getProjectVersion(char* directoryName, int clientfd) {
     free(token);
 }
 
-void calculateFileBytes(char* fileName, fileNode* file){
-	struct stat fileinfo;
-	bzero((char*)&fileinfo, sizeof(struct stat));
-	int success = stat(fileName, &fileinfo);
-	if(success == -1){
-		printf("Error: File not found or lacking permissions to access file to get metadata\n");
-	}else{
-		file->filelength = (long long) fileinfo.st_size;
-	}
-}
-
-fileNode* createFileNode(char* filepath, char* filename){
-	fileNode* newNode = (fileNode*) malloc(sizeof(fileNode) * 1);
-	newNode->filepath = filepath;
-	newNode->filename = filename;
-	calculateFileBytes(filepath, newNode);
-	newNode->next = NULL;
-	newNode->prev = NULL;
-}
-
+/*
+Purpose: Setup the metadata of files
+Format: numOfFiles$lengthofpathname$pathname$filesize
+*/
 void setupFileMetadata(int clientfd, fileNode* files, int numOfFiles){
 	fileNode* file = files;
 	while(file != NULL){
@@ -345,6 +380,10 @@ void setupFileMetadata(int clientfd, fileNode* files, int numOfFiles){
 	}
 }
 
+/*
+Purpose: Send files to the Client
+files must be a linked list of fileNodes
+*/
 void sendFilesToClient(int clientfd, fileNode* files, int numOfFiles){
 	writeToFile(clientfd, "sendFile$");
 	setupFileMetadata(clientfd, files, numOfFiles);
@@ -355,6 +394,9 @@ void sendFilesToClient(int clientfd, fileNode* files, int numOfFiles){
 	}
 }
 
+/*
+Purpose: Send one file to the Client
+*/
 void sendFile(int clientfd, char* filepath){
 	int filefd = open(filepath, O_RDONLY);
 	int read = 0;
@@ -372,15 +414,10 @@ void sendFile(int clientfd, char* filepath){
 	close(filefd);
 }
 
-
-void createManifest(int fd, char* directorypath){
-	writeToFile(fd, "1");
-	writeToFile(fd, "\n");
-	directoryTraverse(directorypath, 0, fd);
-}
-
 /*
 Mode 0: Traverse through and add to manifest (the fd)
+Mode 1: Traverse through the directories and create fileNodes
+Mode 2: Traverse through the directories and for each file, send to Client (Note* you should run MODE 1 to setup the Metadata of all these files)
 */
 void directoryTraverse(char* path, int mode, int fd){ 
 	DIR* dirPath = opendir(path);
@@ -398,12 +435,14 @@ void directoryTraverse(char* path, int mode, int fd){
 			printf("File Found: %s\n", curFile->d_name);
 			char* filepath = pathCreator(path, curFile->d_name);
 			printf("File path: %s\n", filepath);
-			if(strcmp(curFile->d_name, "Manifest") != 0 && mode == 0){
+			if(mode == 0 && strcmp(curFile->d_name, "Manifest") != 0){
 				writeToFile(fd, "1 "); //File version number
 				writeToFile(fd, filepath); //Path to file
 				writeToFile(fd, " "); //Delimiter
 				writeToFile(fd, "HASHCODE"); //HashCode
 				writeToFile(fd, "\n"); //Newline to indicate this file is inserted in the manifest
+			}else if(mode == 1){
+				
 			}
 			free(filepath);
 		}else if(curFile->d_type == DT_DIR){
@@ -415,27 +454,6 @@ void directoryTraverse(char* path, int mode, int fd){
 		curFile = readdir(dirPath);
 	}
 	closedir(dirPath);
-}
-
-char* pathCreator(char* path, char* name){
-	char* newpath = (char *) malloc(sizeof(char) * (strlen(path) + strlen(name) + 2));
-	memcpy(newpath, path, strlen(path));
-	newpath[strlen(path)] = '/';
-	memcpy((newpath + strlen(path) + 1), name, (strlen(name)));
-	newpath[strlen(name) + strlen(path) + 1] = '\0';
-	return newpath;
-}
-
-
-int makeDirectory(char* directoryName){
-	int success = mkdir(directoryName, S_IRWXU);
-	if(success == -1){
-		printf("Warning: Directory could not be created\n");
-		return 0;
-	}else{
-		printf("Directory Created\n");
-		return 1;
-	}
 }
 
 void writeToFile(int fd, char* data){
@@ -450,14 +468,6 @@ void writeToFile(int fd, char* data){
 		}
 		bytesWritten += status;
 	}
-}
-
-char* doubleStringSize(char* word, int newsize){
-	char* expanded =  (char*) malloc(sizeof(char) * (newsize + 1));
-	memset(expanded, '\0', (newsize+1) * sizeof(char));
-	memcpy(expanded, word, strlen(word));
-	free(word);
-	return expanded;
 }
 
 int bufferFill(int fd, char* buffer, int bytesToRead){
@@ -479,6 +489,71 @@ int bufferFill(int fd, char* buffer, int bytesToRead){
     	return bytesRead;
 }
 
+void calculateFileBytes(char* fileName, fileNode* file){
+	struct stat fileinfo;
+	bzero((char*)&fileinfo, sizeof(struct stat));
+	int success = stat(fileName, &fileinfo);
+	if(success == -1){
+		printf("Error: File not found or lacking permissions to access file to get metadata\n");
+	}else{
+		file->filelength = (long long) fileinfo.st_size;
+	}
+}
+
+fileNode* createFileNode(char* filepath, char* filename){
+	fileNode* newNode = (fileNode*) malloc(sizeof(fileNode) * 1);
+	newNode->filepath = filepath;
+	newNode->filename = filename;
+	calculateFileBytes(filepath, newNode);
+	newNode->next = NULL;
+	newNode->prev = NULL;
+}
+
+
+
+/*
+	Given a path: it will generate all subdirectories for the given path (make sure the path ends with the directory and not a file)
+*/
+void makeNestedDirectories(char* path){ 
+	char* parentdirectory = strdup(path);
+	char* directory = strdup(path);
+	char* directoryName = basename(directory);
+	char* parentdirectoryName = dirname(parentdirectory);
+	if(strlen(path) != 0 && strcmp(path, ".") != 0){
+		makeNestedDirectories(parentdirectoryName);
+	}
+	mkdir(path, 0777);
+	free(directory);
+	free(parentdirectory);
+}
+
+int makeDirectory(char* directoryName){
+	int success = mkdir(directoryName, S_IRWXU);
+	if(success == -1){
+		printf("Warning: Directory could not be created\n");
+		return 0;
+	}else{
+		printf("Directory Created\n");
+		return 1;
+	}
+}
+
+char* pathCreator(char* path, char* name){
+	char* newpath = (char *) malloc(sizeof(char) * (strlen(path) + strlen(name) + 2));
+	memcpy(newpath, path, strlen(path));
+	newpath[strlen(path)] = '/';
+	memcpy((newpath + strlen(path) + 1), name, (strlen(name)));
+	newpath[strlen(name) + strlen(path) + 1] = '\0';
+	return newpath;
+}
+
+char* doubleStringSize(char* word, int newsize){
+	char* expanded =  (char*) malloc(sizeof(char) * (newsize + 1));
+	memset(expanded, '\0', (newsize+1) * sizeof(char));
+	memcpy(expanded, word, strlen(word));
+	free(word);
+	return expanded;
+}
 
 int setupServer(int socketfd, int port){
 	struct sockaddr_in serverinfo;
@@ -494,6 +569,20 @@ int setupServer(int socketfd, int port){
 		return 1;
 	}
 }
+
+void insertLL(fileNode* node){
+	if(listOfFiles == NULL){
+		listOfFiles = node;
+	}else{
+		fileNode* temp = listOfFiles;
+		while(temp->next != NULL){
+			temp = temp->next;
+		}
+		temp->next = node;
+		node->prev = temp;
+	}
+}
+
 
 void sighandler(int sig){
 	exit(0);

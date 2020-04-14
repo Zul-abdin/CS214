@@ -20,21 +20,44 @@ typedef struct _fileNode_{
 	struct _fileNode_* prev;
 }fileNode;
 
-void writeToFile(int fd, char* data);
-char* doubleStringSize(char* word, int newsize);
-char** getConfig();
-int bufferFill(int fd, char* buffer, int bytesToRead);
+/*
+	Client Setup Methods
+*/
 int connectToServer(int socketfd, char** serverinfo);
 int createSocket();
 int setupConnection();
+char** getConfig();
+
+/*
+	Helper Methods
+*/
+void createDirectories(fileNode* list);
+int makeDirectory(char* directoryName);
+void makeNestedDirectories(char* path);
+char* doubleStringSize(char* word, int newsize);
+void insertLL(fileNode* node);
+
+/*
+	File Sending Methods
+*/
+void writeToSocketFromFile(int clientfd, char* fileName);
+void sendLength(int socketfd, char* token);
+void writeToFile(int fd, char* data);
+
+/*
+	File Recieving Methods
+*/
 void metadataParser(int clientfd);
 void readNbytes(int fd, int length, char* mode, char** placeholder);
 void writeToFileFromSocket(int socketfd, fileNode* files);
-void writeToSocketFromFile(int clientfd, char* fileName);
+int bufferFill(int fd, char* buffer, int bytesToRead);
+/*
+	Commands Methods
+*/
 void createProject(char* directoryName, int socketfd);
-int makeDirectory(char* directoryName);
 
-fileNode* listOfFiles;
+fileNode* listOfFiles = NULL;
+int numOfFiles = 0;
 
 int main(int argc, char** argv) {
     if(argc != 4 && argc != 3){
@@ -42,7 +65,26 @@ int main(int argc, char** argv) {
     }else{
     	if(argc == 3){
     		if(strlen(argv[1]) == 8 && strcmp(argv[1], "checkout") == 0){  //checkout
+    			int socketfd  = setupConnection();
+    			if(socketfd > 0){
+    				writeToFile(socketfd, "checkout$");
+					sendLength(socketfd, argv[2]);
+					char* temp = NULL;
+					readNbytes(socketfd, strlen("FAILURE"), NULL, &temp);
+					if(strcmp(temp, "SUCCESS") == 0){
+						printf("Server successfully located the project, recieving the project\n");
+						metadataParser(socketfd);
+						createDirectories(listOfFiles);
+					}else if(strcmp(temp, "FAILURE") == 0){
+						printf("Error: Server failed to locate the project, either project did not exist or had no permissions to access the project\n");
+					}else{
+						printf("Error: Could not interpret the server's response\n");
+					}
+					free(temp);
+					close(socketfd);
+    			}else{
     			
+    			}
     		}else if(strlen(argv[1]) == 6 && strcmp(argv[1], "update") == 0){ //update
     			
     		}else if(strlen(argv[1]) == 7 && strcmp(argv[1], "upgrade") == 0){ //upgrade
@@ -55,11 +97,7 @@ int main(int argc, char** argv) {
 				int socketfd = setupConnection();
 				if(socketfd > 0){
 					writeToFile(socketfd, "create$");
-					char str[3] = {'\0'};
-					sprintf(str, "%lu", strlen(argv[2]));
-					writeToFile(socketfd, str);
-					writeToFile(socketfd, "$");
-					writeToFile(socketfd, argv[2]);
+					sendLength(socketfd, argv[2]);
 					char* temp = NULL;
 					readNbytes(socketfd, strlen("FAILURE"), NULL, &temp);
 					if(strcmp(temp, "SUCCESS") == 0){
@@ -82,11 +120,7 @@ int main(int argc, char** argv) {
 				int socketfd = setupConnection();
 				if(socketfd > 0){
 					writeToFile(socketfd, "currentversion$");
-					char str[3] = {'\0'};
-					sprintf(str, "%lu", strlen(argv[2]));
-					writeToFile(socketfd, str);
-					writeToFile(socketfd, "$");
-					writeToFile(socketfd, argv[2]);
+					sendLength(socketfd, argv[2]);
  					char* temp = NULL;
 					readNbytes(socketfd, strlen("FAILURE"), NULL, &temp);
 					if(strcmp(temp, "SUCCESS") == 0){
@@ -138,6 +172,23 @@ int main(int argc, char** argv) {
     return 0;
 }
 
+void sendLength(int socketfd, char* token){
+	char str[5] = {'\0'};
+	sprintf(str, "%lu", strlen(token));
+	writeToFile(socketfd, str);
+	writeToFile(socketfd, "$");
+	writeToFile(socketfd, token);
+}
+/*
+Purpose: Parses the metadata
+	$ is the delimiter
+	Modes: 
+		- output
+		Format: output$dataBytes$data
+		- sendFile
+		Format: sendFile$numOfFiles$file1_name_bytes$file1name sizeoffile1$(...repeat for number of files...) file1contentfile2contentfile3content (...repeat for number of files...)
+		*Note the space between filename and sizeoffile is added for readablility, it should not have a space and () indicates the previous pattern repeats for the number of files, everything should be one continous token
+*/
 void metadataParser(int clientfd){
 	char buffer[1] = {'\0'}; 
 	int defaultSize = 15;
@@ -146,11 +197,11 @@ void metadataParser(int clientfd){
 	int read = 0;
 	int bufferPos = 0;
 	int tokenpos = 0;
-	int numOfFiles = 0; //Could change this to array and have each index store the fileLength 
-	int fileLength = 0;
 	int filesRead = 0;
-	int fileName = 0; //Could change this to a linked list of file names or an array of file names
+	int readName = 0; 
 	listOfFiles = NULL; 
+	fileNode* file = NULL;
+	numOfFiles = 0;
 	char* mode = NULL;
 	do{
 		read = bufferFill(clientfd, buffer, sizeof(buffer));
@@ -159,49 +210,59 @@ void metadataParser(int clientfd){
 				mode = token;
 				printf("%s\n", mode);
 			}else if(strcmp(mode, "output") == 0){
-				char* temp = NULL;
 				int responseLength = atoi(token);
 				free(token);
-				readNbytes(clientfd, responseLength, NULL, &temp);
-				printf("%s", temp);
-				free(temp);
+				readNbytes(clientfd, responseLength, NULL, NULL);
 				break;
 			}else if(strcmp(mode, "sendFile") == 0){
 				if(numOfFiles == 0){
 					numOfFiles = atoi(token);
-					listOfFiles = calloc(numOfFiles, sizeof(fileNode));
+					
+					file = (fileNode*) malloc(sizeof(fileNode) * 1);
+					file->next = NULL;
+					file->prev = NULL;
+					
 					free(token);
-				}else if(fileName == 0){
+				}else if(readName == 0){
 					char* temp = NULL;
-					fileLength = atoi(token);
-					readNbytes(clientfd, fileLength, NULL, &temp);
-					listOfFiles[filesRead].filepath = temp;
+					int filepathlength = atoi(token);
+					readNbytes(clientfd, filepathlength, NULL, &temp);
+					file->filepath = temp;
 					
 					char* name = (char*) malloc(sizeof(char) * strlen(basename(temp)) + 1);
 					memset(name, '\0', sizeof(char) * strlen(basename(temp)) + 1);
 					memcpy(name, basename(temp), strlen(basename(temp)));
-					listOfFiles[filesRead].filename = name;
+					file->filename = name;
 					
 					free(token);
-					fileName = 1;
+					readName = 1;
 				}else{
-					fileName = 0;
-					listOfFiles[filesRead].filelength = (long long) atoi(token);
+					file->filelength = (long long) atoi(token);
+					insertLL(file);
+					
+					file = (fileNode*) malloc(sizeof(fileNode) * 1);
+					file->next = NULL;
+					file->prev = NULL;
+					
 					filesRead++;
 					free(token);
+					readName = 0;
 				}
 				if(numOfFiles == filesRead){
-					int filenumber = 0;
-					for(filenumber = 0; filenumber < numOfFiles; ++filenumber){
-						printf("File: %s\n", listOfFiles[filenumber].filename);
+					fileNode* temp = listOfFiles;
+					while(temp != NULL){
+						printf("File: %s\n", temp->filename);
+						temp = temp->next;
 					}
 					break;
 				}
+			}else{
+			
 			}
-				defaultSize = 10;
-				tokenpos = 0;
-				token = (char*) malloc(sizeof(char) * (defaultSize + 1));
-				memset(token, '\0', sizeof(char) * (defaultSize + 1));
+			defaultSize = 10;
+			tokenpos = 0;
+			token = (char*) malloc(sizeof(char) * (defaultSize + 1));
+			memset(token, '\0', sizeof(char) * (defaultSize + 1));
 		}else{
 			if(tokenpos >= defaultSize){
 				defaultSize = defaultSize * 2;
@@ -216,11 +277,39 @@ void metadataParser(int clientfd){
 		}
 }
 
+/*
+	Automatically creates the Manifest file and calls writeToFileFromSocket to read the socket and store the data in the files
+*/
+void createProject(char* directoryName, int socketfd){
+	printf("Attempting to create the directory\n");
+	int success = makeDirectory(directoryName);
+	if(success){
+		char* manifest = malloc(sizeof(char) * strlen(directoryName) + 3 + strlen("/Manifest"));
+		memset(manifest, '\0', sizeof(char) * strlen(directoryName) + 3 + strlen("/Manifest"));
+		manifest[0] = '.';
+		manifest[1] = '/';
+		memcpy(manifest + 2, directoryName, strlen(directoryName));
+		strcat(manifest, "/Manifest");
+		int fd = open(manifest, O_WRONLY | O_TRUNC | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
+		close(fd);
+		free(manifest);
+		writeToFileFromSocket(socketfd, listOfFiles);
+	}else{
+		printf("Client: Directory Failed to Create\n");
+	}
+}
+
+/*
+	Reads N bytes specified by length
+		IF MODE = NULL: creates a token and stores into placeholder
+		IF MODE = NULL AND placeholder = NULL, outputs to the terminal
+*/
 void readNbytes(int fd, int length, char* mode, char** placeholder){
 	char buffer[100] = {'\0'};
 	int defaultSize = 15;
 	char* token = malloc(sizeof(char) * (defaultSize + 1));
 	memset(token, '\0', sizeof(char) * (defaultSize + 1));
+	
 	int tokenpos = 0;
 	int read = 0;
 	int bufferPos = 0;
@@ -244,14 +333,22 @@ void readNbytes(int fd, int length, char* mode, char** placeholder){
 			token[tokenpos] = buffer[bufferPos];
 			tokenpos++;
 			}
+		}else if(mode == NULL && placeholder == NULL){
+			printf("%s", buffer);
 		}
 		length = length - read;
 	}while(buffer[0] != '\0' && read != 0);
-	if(mode == NULL){
+	if(mode == NULL && placeholder == NULL){
+		printf("%s", buffer);
+	}else if(mode == NULL){
 		*placeholder = token;
 	}
 }
 
+/*
+Purpose: Reads data from the socket and writes to the files
+	Assuming files is an linked list of fileNode* (generated by metadataParser)
+*/
 void writeToFileFromSocket(int socketfd, fileNode* files){
 	char buffer[100] = {'\0'};
 	fileNode* file = files;
@@ -277,6 +374,9 @@ void writeToFileFromSocket(int socketfd, fileNode* files){
 	}
 }
 
+/*
+Purpose: Reads data from a single file and writes to the socket
+*/
 void writeToSocketFromFile(int clientfd, char* fileName){
 	int filefd = open(fileName, O_RDONLY);
 	int read = 0;
@@ -294,33 +394,99 @@ void writeToSocketFromFile(int clientfd, char* fileName){
 	close(filefd);
 }
 
-void createProject(char* directoryName, int socketfd){
-	printf("Attempting to create the directory\n");
-	int success = makeDirectory(directoryName);
-	if(success){
-		char* manifest = malloc(sizeof(char) * strlen(directoryName) + 3 + strlen("/Manifest"));
-		memset(manifest, '\0', sizeof(char) * strlen(directoryName) + 3 + strlen("/Manifest"));
-		manifest[0] = '.';
-		manifest[1] = '/';
-		memcpy(manifest + 2, directoryName, strlen(directoryName));
-		strcat(manifest, "/Manifest");
-		int fd = open(manifest, O_WRONLY | O_TRUNC | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
-		close(fd);
-		free(manifest);
-		writeToFileFromSocket(socketfd, listOfFiles);
-	}else{
-		printf("Client: Directory Failed to Create\n");
+/*
+	Given a buffer and bytesToRead, it will attempt to read the fd and fill the buffer
+		bytesToRead should be <= sizeof(buffer)
+*/
+int bufferFill(int fd, char* buffer, int bytesToRead){
+    int position = 0;
+    int bytesRead = 0;
+    int status = 0;
+    memset(buffer, '\0', bytesToRead);
+    do{
+        status = read(fd, (buffer + bytesRead), bytesToRead-bytesRead);
+        if(status == 0){
+       		break;
+        }else if(status == -1){
+            printf("Warning: Error when reading the file reading\n");
+            return bytesRead;
+        }
+        bytesRead += status;
+    }while(bytesRead < bytesToRead);
+    	return bytesRead;
+}
+
+/*
+	Given a null terminated char array, it will write all bytes from this array to the file
+*/
+void writeToFile(int fd, char* data){
+	int bytesToWrite = strlen(data);
+	int bytesWritten = 0;
+	int status = 0;
+	while(bytesWritten < bytesToWrite){
+		status = write(fd, (data + bytesWritten), (bytesToWrite - bytesWritten));
+		if(status == -1){
+			printf("Warning: write encountered an error\n");
+			close(fd);
+			return;
+		}
+		bytesWritten += status;
+	}
+}
+void createDirectories(fileNode* list){
+	fileNode* file = list;
+	while(file != NULL){
+		char* temp = strdup(file->filepath);
+		char* subdirectories = dirname(temp);
+		makeNestedDirectories(subdirectories);
+		free(temp);
+		file = file->next;
 	}
 }
 
-int makeDirectory(char* directoryName){
-	int success = mkdir(directoryName, S_IRWXU);
+/*
+	Creates a single directory, given the directory path (does not work with nested directories)
+*/
+int makeDirectory(char* directoryPath){
+	int success = mkdir(directoryPath, S_IRWXU);
 	if(success == -1){
 		printf("Warning: Directory could not be created\n");
 		return 0;
 	}else{
 		printf("Directory Created\n");
 		return 1;
+	}
+}
+
+/*
+	Given a directory path, will construct the whole directory path (including the nested directories) and will not overwrite directories that exist
+*/
+void makeNestedDirectories(char* path){ 
+	char* parentdirectory = strdup(path);
+	char* directory = strdup(path);
+	char* directoryName = basename(directory);
+	char* parentdirectoryName = dirname(parentdirectory);
+	if(strlen(path) != 0 && strcmp(path, ".") != 0){
+		makeNestedDirectories(parentdirectoryName);
+	}
+	mkdir(path, 0777);
+	free(directory);
+	free(parentdirectory);
+}
+
+/*
+	Inserts the fileNode at the tail (to perverse the order)
+*/
+void insertLL(fileNode* node){
+	if(listOfFiles == NULL){
+		listOfFiles = node;
+	}else{
+		fileNode* temp = listOfFiles;
+		while(temp->next != NULL){
+			temp = temp->next;
+		}
+		temp->next = node;
+		node->prev = temp;
 	}
 }
 
@@ -372,16 +538,12 @@ int connectToServer(int socketfd, char** serverinfo){
 }
 
 int generateHash(char* seed){
-	int loop = 0;
-	int hash = 0;
-	for(loop = 0; loop < strlen(seed); ++loop){
-		hash = ((hash << 5) - hash) + seed[loop];
-	}
-	return hash;
+	//TO BE IMPLEMENTED
 }
 /*
-1st Element = IP
-2nd Element = Port
+Returns a char** that contains:
+	1st Element = IP
+	2nd Element = Port
 */
 char** getConfig(){
 	int fd = open("configure", O_RDONLY);
@@ -432,38 +594,3 @@ char* doubleStringSize(char* word, int newsize){
 	free(word);
 	return expanded;
 }
-
-int bufferFill(int fd, char* buffer, int bytesToRead){
-    int position = 0;
-    int bytesRead = 0;
-    int status = 0;
-    memset(buffer, '\0', bytesToRead);
-    do{
-        status = read(fd, (buffer + bytesRead), bytesToRead-bytesRead);
-        if(status == 0){
-       		break;
-        }else if(status == -1){
-            printf("Warning: Error when reading the file reading\n");
-            return bytesRead;
-        }
-        bytesRead += status;
-    }while(bytesRead < bytesToRead);
-    	return bytesRead;
-}
-
-
-void writeToFile(int fd, char* data){
-	int bytesToWrite = strlen(data);
-	int bytesWritten = 0;
-	int status = 0;
-	while(bytesWritten < bytesToWrite){
-		status = write(fd, (data + bytesWritten), (bytesToWrite - bytesWritten));
-		if(status == -1){
-			printf("Warning: write encountered an error\n");
-			close(fd);
-			return;
-		}
-		bytesWritten += status;
-	}
-}
-
