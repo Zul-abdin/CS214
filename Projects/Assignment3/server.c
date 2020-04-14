@@ -9,13 +9,14 @@
 #include <sys/socket.h>
 #include <errno.h>
 #include <signal.h>
+#include <libgen.h>
 #include <stdlib.h>
 #include <stdio.h>
 
 typedef struct _fileNode_{
 	char* filename;
-	long long filelength;
 	char* filepath;
+	long long filelength;
 	struct _fileNode_* next;
 	struct _fileNode_* prev;
 }fileNode;
@@ -38,8 +39,8 @@ void createManifest(int fd, char* directorypath);
 char* pathCreator(char* path, char* name);
 void sendFile(int clientfd, char* fileName);
 void calculateFileBytes(char* fileName, fileNode* file);
-void setupMetadata(int clientfd, fileNode* files, int numOfFiles);
-void sendToClient(int clientfd, fileNode* files, int numOfFiles);
+void setupFileMetadata(int clientfd, fileNode* files, int numOfFiles);
+void sendFilesToClient(int clientfd, fileNode* files, int numOfFiles);
 fileNode* createFileNode(char* filepath, char* filename);
 
 int main(int argc, char** argv){
@@ -121,7 +122,14 @@ void metadataParser(int clientfd){
 				}else if(fileName == 0){
 					char* temp = NULL;
 					readNbytes(clientfd, atoi(token), NULL, &temp);
-					listOfFiles[filesRead].filename = temp;
+					listOfFiles[filesRead].filepath = temp;
+					
+					char* temp1 = basename(temp);
+					char* name = (char*) malloc(sizeof(char) * strlen(temp1) + 1);
+					memset(name, '\0', sizeof(char) * strlen(temp1) + 1);
+					memcpy(name, temp1, strlen(temp1));
+					listOfFiles[filesRead].filename = name;
+					
 					free(token);
 					fileName = 1;
 				}else{
@@ -131,7 +139,11 @@ void metadataParser(int clientfd){
 					free(token);
 				}
 				if(numOfFiles == filesRead){
-						//LOOP THROUGH LINKED LIST OF FILE NODES and create and scan.
+					int filenumber = 0;
+					for(filenumber = 0; filenumber < numOfFiles; ++filenumber){
+						printf("File: %s\n", listOfFiles[filenumber].filename);
+					}
+					break;
 				}
 			}
 			defaultSize = 10;
@@ -151,7 +163,7 @@ void metadataParser(int clientfd){
 
 /*
 	If Mode is NULL, it will place the token inside the placeholder
-
+	
 */
 void readNbytes(int fd, int length, char* mode, char** placeholder){
 	char buffer[100] = {'\0'};
@@ -205,7 +217,7 @@ void createProject(char* directoryName, int clientfd){
 		printf("Sending the Manifest to Client\n");
 		writeToFile(clientfd, "SUCCESS");
 		fileNode* manifestNode = createFileNode(manifest, "Manifest");
-		sendToClient(clientfd, manifestNode, 1);
+		sendFilesToClient(clientfd, manifestNode, 1);
 		free(manifest);
 	}else{
 		printf("Directory Failed to Create: Sending Error to Client\n");
@@ -213,31 +225,84 @@ void createProject(char* directoryName, int clientfd){
 		//SEND ERROR TO CLIENT
 	}
 }
-
+/*
+	The Client will recieve 
+		SUCCESS if the Manifest is found
+		FAILURE if the Manifest is not found
+	If SUCCESS: the server will create a long token that is the format of 
+		NumberOfBytesOfToken$FileVersion\sFilepath\n
+		Note the pattern will repeat for all files in the project and it will be one long continous token
+*/
 void getProjectVersion(char* directoryName, int clientfd) {
     printf("Attempting to get project Version\n");
     int fdManifest = open(strcat(directoryName, "/Manifest"), O_RDONLY);
-    char buffer[1] = {'\0'};
-    int defaultSize = 50;
+    if(fdManifest == -1){
+    	printf("Error: Project's Manifest Requested does not exist or does not have permissions to access on the server side, sending error to client\n");
+    	writeToFile(clientfd, "FAILURE");
+    	return;
+    }else{
+    	printf("Successfully found the project requested\n");
+    	writeToFile(clientfd, "SUCCESS");
+    }
+    char buffer[50] = {'\0'};
+    int defaultSize = 25;
     char *token = malloc(sizeof(char) * (defaultSize + 1));
     memset(token, '\0', sizeof(char) * (defaultSize + 1));
+    
     int read = 0;
-    char *line = NULL;
-    int length;
+    int tokenpos = 0;
+    int bufferPos = 0;
+    int numOfSpaces = 0;
+    
+    int manifestVersion = 0;
+    
     do {
         read = bufferFill(fdManifest, buffer, sizeof(buffer));
-        if (buffer[0] == '\n') {
-            if (line == NULL) {
-                line = token;
-                printf("%s\n", line);
-                writeToFile(clientfd, line);
-                if(read !=0){
-                    writeToFile(clientfd, "$"); //Tells client another line is coming
-                }
-            }
+        for(bufferPos = 0; bufferPos < (sizeof(buffer)/sizeof(buffer[0])); ++bufferPos){
+		     if(buffer[bufferPos] == '\n') { 
+		     		if(manifestVersion == 0){ //This is for version of the Manifest (we don't want to send this to client)
+		     			manifestVersion = 1; 
+		     			free(token);
+		     			
+		     			tokenpos = 0;
+		     			defaultSize = 25;
+		     			char *token = malloc(sizeof(char) * (defaultSize + 1));
+   					memset(token, '\0', sizeof(char) * (defaultSize + 1));
+		     		}else{
+		     			if(tokenpos >= defaultSize){ 
+							defaultSize = defaultSize * 2;
+							token = doubleStringSize(token, defaultSize);
+						}
+						token[tokenpos] = buffer[bufferPos];
+						tokenpos++;
+						numOfSpaces = 0;
+		     		} 
+		     }else{
+		     		if(buffer[bufferPos] == ' '){
+		     			numOfSpaces++;
+		     		}
+		     		if(numOfSpaces < 2){
+		     			if(tokenpos >= defaultSize){
+							defaultSize = defaultSize * 2;
+							token = doubleStringSize(token, defaultSize);
+						}
+						token[tokenpos] = buffer[bufferPos];
+						tokenpos++;
+		     		}
+		     }
         }
     }while (buffer[0] != '\0' && read != 0);
-    writeToFile(clientfd, "#"); //Tells client no more file lines remain
+    if(token[0] == '\0'){
+    	printf("The project has no files\n");
+    }
+    printf("Sending the Client: %s\n", token);
+    writeToFile(clientfd, "output$");
+	 char str[3] = {'\0'};
+	 sprintf(str, "%d", tokenpos);
+	 writeToFile(clientfd, str);
+	 writeToFile(clientfd, "$");
+	 writeToFile(clientfd, token);
+    free(token);
 }
 
 void calculateFileBytes(char* fileName, fileNode* file){
@@ -245,7 +310,7 @@ void calculateFileBytes(char* fileName, fileNode* file){
 	bzero((char*)&fileinfo, sizeof(struct stat));
 	int success = stat(fileName, &fileinfo);
 	if(success == -1){
-		printf("Error: File not found to get metadata\n");
+		printf("Error: File not found or lacking permissions to access file to get metadata\n");
 	}else{
 		file->filelength = (long long) fileinfo.st_size;
 	}
@@ -260,7 +325,7 @@ fileNode* createFileNode(char* filepath, char* filename){
 	newNode->prev = NULL;
 }
 
-void setupMetadata(int clientfd, fileNode* files, int numOfFiles){
+void setupFileMetadata(int clientfd, fileNode* files, int numOfFiles){
 	fileNode* file = files;
 	while(file != NULL){
 		char str[3] = {'\0'};
@@ -280,9 +345,9 @@ void setupMetadata(int clientfd, fileNode* files, int numOfFiles){
 	}
 }
 
-void sendToClient(int clientfd, fileNode* files, int numOfFiles){
+void sendFilesToClient(int clientfd, fileNode* files, int numOfFiles){
 	writeToFile(clientfd, "sendFile$");
-	setupMetadata(clientfd, files, numOfFiles);
+	setupFileMetadata(clientfd, files, numOfFiles);
 	fileNode* file = files;
 	while(file != NULL){
 		sendFile(clientfd, file->filepath);
@@ -320,7 +385,7 @@ Mode 0: Traverse through and add to manifest (the fd)
 void directoryTraverse(char* path, int mode, int fd){ 
 	DIR* dirPath = opendir(path);
 	if(!dirPath){
-		printf("Fatal Error: Directory path does not exist!\n");
+		printf("Fatal Error: Directory path does not exist or no valid permissions!\n");
 		return;
 	}
 	struct dirent* curFile = readdir(dirPath);

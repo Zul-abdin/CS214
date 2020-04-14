@@ -7,10 +7,10 @@
 #include <dirent.h>
 #include <sys/socket.h>
 #include <netdb.h>
-#include <time.h>
+#include <libgen.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <libgen.h>
+
 
 typedef struct _fileNode_{
 	char* filename;
@@ -38,7 +38,7 @@ fileNode* listOfFiles;
 
 int main(int argc, char** argv) {
     if(argc != 4 && argc != 3){
-    	printf("Incorrect number of arguments.\n");    
+    	printf("Fatal Error: Incorrect number of arguments.\n");    
     }else{
     	if(argc == 3){
     		if(strlen(argv[1]) == 8 && strcmp(argv[1], "checkout") == 0){  //checkout
@@ -67,8 +67,11 @@ int main(int argc, char** argv) {
 						metadataParser(socketfd);
 						createProject(argv[2], socketfd);
 					}else if(strcmp(temp , "FAILURE") == 0){
-						printf("Server failed to created the project\n");
+						printf("Error: Server failed to created the project\n");
+					}else{
+						printf("Error: Could not interpret the server's response\n");
 					}
+					free(temp);
 					close(socketfd);
 				}else{
 				
@@ -78,26 +81,33 @@ int main(int argc, char** argv) {
     		}else if(strlen(argv[1]) == 14 && strcmp(argv[1], "currentversion") == 0){ //currentversion
 				int socketfd = setupConnection();
 				if(socketfd > 0){
-                    writeToFile(socketfd, "currentversion$");
-                    char str[3] = {'\0'};
-                    sprintf(str, "%lu", strlen(argv[2]));
-                    writeToFile(socketfd, str);
-                    writeToFile(socketfd, "$");
-                    writeToFile(socketfd, argv[2]);
-                    char* temp = NULL;
-                    do {
-                        readNbytes(socketfd, 50, NULL, &temp);
-                        printf("%s", temp);
-                        readNbytes(socketfd, 1, NULL, &temp);
-                    } while(strcmp(temp, "$") == 0);
-                    close(socketfd);
+					writeToFile(socketfd, "currentversion$");
+					char str[3] = {'\0'};
+					sprintf(str, "%lu", strlen(argv[2]));
+					writeToFile(socketfd, str);
+					writeToFile(socketfd, "$");
+					writeToFile(socketfd, argv[2]);
+ 					char* temp = NULL;
+					readNbytes(socketfd, strlen("FAILURE"), NULL, &temp);
+					if(strcmp(temp, "SUCCESS") == 0){
+						char* response = NULL;
+						printf("Server Succesfully located the project, recieving the files and versions\n");
+						metadataParser(socketfd);
+					}else if(strcmp(temp, "FAILURE") == 0){
+						printf("Error: Server could not locate the project\n");
+					}else{
+						printf("Error: Could not interpret the server's response\n");
+					}
+					free(temp);
+               close(socketfd);
 				}else{
-				
+						
 				}
+				
     		}else if(strlen(argv[1]) == 7 && strcmp(argv[1], "history") == 0){ //history
     			
     		}else{
-    			printf("Invalid operation\n");
+    			printf("Fatal Error: Invalid operation or Improperly Formatted\n");
     		}
     		
     	}else{
@@ -121,7 +131,7 @@ int main(int argc, char** argv) {
     		}else if(strlen(argv[1]) == 8 && strcmp(argv[1], "rollback") == 0){ //Rollback
     		
     		}else{
-    			printf("Invalid operation\n");
+    			printf("Fatal Error: Invalid operation or Improperly Formatted\n");
     		}
     	}
     }
@@ -148,8 +158,14 @@ void metadataParser(int clientfd){
 			if(mode == NULL){
 				mode = token;
 				printf("%s\n", mode);
-			}else if(strcmp(mode, "ERROR") == 0){
-				break;	
+			}else if(strcmp(mode, "output") == 0){
+				char* temp = NULL;
+				int responseLength = atoi(token);
+				free(token);
+				readNbytes(clientfd, responseLength, NULL, &temp);
+				printf("%s", temp);
+				free(temp);
+				break;
 			}else if(strcmp(mode, "sendFile") == 0){
 				if(numOfFiles == 0){
 					numOfFiles = atoi(token);
@@ -160,13 +176,12 @@ void metadataParser(int clientfd){
 					fileLength = atoi(token);
 					readNbytes(clientfd, fileLength, NULL, &temp);
 					listOfFiles[filesRead].filepath = temp;
-					char* temp1 = (char*)basename(temp);
-					printf("The basename is %s and %lu\n", temp1, strlen(temp1));
 					
-					char* name = (char*) malloc(sizeof(char) * strlen(temp1) + 1);
-					memset(name, '\0', sizeof(char) * strlen(temp1) + 1);
-					memcpy(name, temp1, strlen(temp1));
+					char* name = (char*) malloc(sizeof(char) * strlen(basename(temp)) + 1);
+					memset(name, '\0', sizeof(char) * strlen(basename(temp)) + 1);
+					memcpy(name, basename(temp), strlen(basename(temp)));
 					listOfFiles[filesRead].filename = name;
+					
 					free(token);
 					fileName = 1;
 				}else{
@@ -196,6 +211,9 @@ void metadataParser(int clientfd){
 			tokenpos++;
 		}
 	}while(buffer[0] != '\0' && read != 0);
+		if(mode != NULL){
+			free(mode);
+		}
 }
 
 void readNbytes(int fd, int length, char* mode, char** placeholder){
@@ -242,7 +260,7 @@ void writeToFileFromSocket(int socketfd, fileNode* files){
 		int read = 0;
 		int filefd = open(file->filepath, O_WRONLY);
 		if(filefd == -1){
-			printf("Fatal Error: Could not write to File from the Socket because File did not exist\n");
+			printf("Fatal Error: Could not write to File from the Socket because File did not exist or no permissions\n");
 		}
 		while(filelength != 0){
 			if(filelength > sizeof(buffer)){
@@ -263,7 +281,7 @@ void writeToSocketFromFile(int clientfd, char* fileName){
 	int filefd = open(fileName, O_RDONLY);
 	int read = 0;
 	if(filefd == -1){
-		printf("Fatal Error: Could not send file because file did not exist\n");
+		printf("Fatal Error: Could not send file because file did not exist or no permissions\n");
 		return;
 	}
 	char buffer[101] = {'\0'}; // Buffer is sized to 101 because we need a null terminated char array for writeToFile method since it performs a strlen
@@ -272,7 +290,7 @@ void writeToSocketFromFile(int clientfd, char* fileName){
 		printf("The buffer has %s\n", buffer);
 		writeToFile(clientfd, buffer);
 	}while(buffer[0] != '\0' && read != 0);
-	printf("Finished sending file: %s to client\n", fileName);
+	printf("Finished sending file: %s to Server\n", fileName);
 	close(filefd);
 }
 
@@ -368,11 +386,11 @@ int generateHash(char* seed){
 char** getConfig(){
 	int fd = open("configure", O_RDONLY);
 	if(fd == -1){
-		printf("Fatal Error: Configure file is missing, please call configure before running\n");
+		printf("Fatal Error: Configure file is missing or no permissions to Configure file, please call configure before running\n");
 		return NULL;
 	}
 	int read = 0;
-	char buffer[25];
+	char buffer[25] = {'\0'};
 	int bufferPos = 0;
 	int tokenpos = 0;
 	int defaultSize = 10;
