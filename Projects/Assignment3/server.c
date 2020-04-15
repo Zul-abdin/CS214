@@ -58,7 +58,8 @@ void directoryTraverse(char* path, int mode, int fd);
 void calculateFileBytes(char* fileName, fileNode* file);
 fileNode* createFileNode(char* filepath, char* filename);
 void insertLL(fileNode* node);
-
+void readManifestFiles(char* projectName, int mode, int clientfd);
+void printFiles();
 /*
 	Command Methods
 */
@@ -128,7 +129,9 @@ void metadataParser(int clientfd){
 				free(token);
 				char* temp = NULL;
 				readNbytes(clientfd, fileLength, NULL, &temp);
-				
+				readManifestFiles(temp, 0, clientfd);
+				printFiles();
+				sendFilesToClient(clientfd, listOfFiles, numOfFiles);
 				free(temp);
 			}else if(strcmp(mode, "create") == 0) {
 				printf("Reading the filename to create\n");
@@ -205,6 +208,13 @@ void metadataParser(int clientfd){
 		}
 	}while(buffer[0] != '\0' && read != 0);
 }
+void printFiles(){
+	fileNode* temp = listOfFiles;
+	while(temp != NULL){
+		printf("File: %s with path of %s and length of %llu\n", temp->filename, temp->filepath, temp->filelength);
+		temp = temp->next;
+	}
+}
 
 /*
 	Reads N bytes specified by length
@@ -274,6 +284,82 @@ void createManifest(int fd, char* directorypath){
 	writeToFile(fd, "1");
 	writeToFile(fd, "\n");
 	directoryTraverse(directorypath, 0, fd);
+}
+
+/*
+	Read the Manifest and Record all the files as file objects and then read all the files. (Discard file version and data)
+*/
+void readManifestFiles(char* projectName, int mode, int clientfd){
+	char* manifest = malloc(sizeof(char) * strlen(projectName) + 3 + strlen("/Manifest"));
+	memset(manifest, '\0', sizeof(char) * strlen(projectName) + 3 + strlen("/Manifest"));
+	manifest[0] = '.';
+	manifest[1] = '/';
+	memcpy(manifest + 2, projectName, strlen(projectName));
+	strcat(manifest, "/Manifest");
+	
+	numOfFiles = 0;
+	int manifestfd = open(manifest, O_RDONLY);
+	if(manifestfd == -1){
+		printf("Error: Server does not contain the project or the Manifest is missing, sending error to client\n");
+		writeToFile(clientfd, "FAILURE");
+	}else{
+		writeToFile(clientfd, "SUCCESS");
+		printf("Searching the Manifest for the list of all files\n");
+		numOfFiles++;
+		fileNode* ManifestNode = createFileNode(manifest, "Manifest");
+		insertLL(ManifestNode);
+		
+		char buffer[100] = {'\0'};
+    	int defaultSize = 25;
+    	char *token = malloc(sizeof(char) * (defaultSize + 1));
+    	memset(token, '\0', sizeof(char) * (defaultSize + 1));
+    
+    	int read = 0;
+    	int tokenpos = 0;
+    	int bufferPos = 0;
+    	int numOfSpaces = 0;
+    
+    	int manifestVersion = 0;
+    
+    	do{
+        read = bufferFill(manifestfd, buffer, sizeof(buffer));
+        for(bufferPos = 0; bufferPos < (sizeof(buffer)/sizeof(buffer[0])); ++bufferPos){
+			  if(buffer[bufferPos] == '\n'){ 
+		     		if(manifestVersion == 0){ //This is for version of the Manifest 
+		     			manifestVersion = 1; 
+		     		}else{
+		     			int defaultSize = 25;
+    					token = malloc(sizeof(char) * (defaultSize + 1));
+   				 	memset(token, '\0', sizeof(char) * (defaultSize + 1));
+   				 	tokenpos = 0;
+		     			numOfSpaces = 0;
+		     		}
+		     }else if(buffer[bufferPos] == ' '){
+		    		numOfSpaces++;
+		    		if(numOfSpaces == 2){
+		    			char* temp = strdup(token);
+		    			char* filename = basename(temp);
+		    			printf("The filepath is:%s\n",token);
+		    			fileNode* newFile = createFileNode(token, filename);
+		    			insertLL(newFile);
+		    			numOfFiles++;
+		    			free(temp);
+		    		}
+			  }else{
+				if(manifestVersion != 0 && numOfSpaces == 1){
+		    		if(tokenpos >= defaultSize){
+						defaultSize = defaultSize * 2;
+						token = doubleStringSize(token, defaultSize);
+					}
+					token[tokenpos] = buffer[bufferPos];
+					tokenpos++;
+		    	}
+		    }
+        }
+		}while (buffer[0] != '\0' && read != 0);
+		free(token);
+		printf("The List of files in project is:\n");
+	}
 }
 
 /*
@@ -362,12 +448,12 @@ Format: numOfFiles$lengthofpathname$pathname$filesize
 */
 void setupFileMetadata(int clientfd, fileNode* files, int numOfFiles){
 	fileNode* file = files;
+	char str[5] = {'\0'};
+	sprintf(str, "%d", numOfFiles);
+	writeToFile(clientfd, str);
+	writeToFile(clientfd, "$");
 	while(file != NULL){
-		char str[3] = {'\0'};
-		sprintf(str, "%d", numOfFiles);
-		writeToFile(clientfd, str);
-		writeToFile(clientfd, "$");
-		memset(str, '\0', sizeof(char) * 3);
+		memset(str, '\0', sizeof(char) * 5);
 		sprintf(str, "%lu", strlen(file->filepath));
 		writeToFile(clientfd, str);
 		writeToFile(clientfd, "$");
@@ -389,7 +475,20 @@ void sendFilesToClient(int clientfd, fileNode* files, int numOfFiles){
 	setupFileMetadata(clientfd, files, numOfFiles);
 	fileNode* file = files;
 	while(file != NULL){
-		sendFile(clientfd, file->filepath);
+		printf("File path: %s\n", file->filepath);
+		if(file->filepath[0] == '.' && file->filepath[1] == '/'){
+			sendFile(clientfd, file->filepath);
+		}else{
+			char* temp = (char*) malloc(sizeof(char) * strlen(file->filepath) + 3);
+			memset(temp, '\0', strlen(file->filepath) + 3);
+			temp[0] = '.';
+			temp[1] = '/';
+			memcpy(temp+2, file->filepath, strlen(file->filepath));
+			printf("The new path is %s\n", temp);
+			sendFile(clientfd, temp);
+			free(temp);
+		}
+		
 		file = file->next;
 	}
 }
@@ -401,7 +500,7 @@ void sendFile(int clientfd, char* filepath){
 	int filefd = open(filepath, O_RDONLY);
 	int read = 0;
 	if(filefd == -1){
-		printf("Fatal Error: Could not send file because file did not exit\n");
+		printf("Fatal Error: Could not send file because file did not exist\n");
 		return;
 	}
 	char buffer[101] = {'\0'}; // Buffer is sized to 101 because we need a null terminated char array for writeToFile method since it performs a strlen
@@ -441,7 +540,7 @@ void directoryTraverse(char* path, int mode, int fd){
 				writeToFile(fd, " "); //Delimiter
 				writeToFile(fd, "HASHCODE"); //HashCode
 				writeToFile(fd, "\n"); //Newline to indicate this file is inserted in the manifest
-			}else if(mode == 1){
+			}else if(mode == 1 && strcmp(curFile->d_name, "Manifest") != 0){
 				
 			}
 			free(filepath);
