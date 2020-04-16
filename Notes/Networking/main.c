@@ -75,23 +75,30 @@ int main() {
      *   - Format: Dotted Octets, From 000.000.000 to 255.255.255.255
      * - Port Number - identifies which Process on a given host to relay data/a message to
      *
-     * - ISO OSI: 7-layer stack to generalize networking: Higher Layers Use Lower Layers as a service
+     * - ISO OSI: 7-layer stack to generalize networking: Higher Layers Use Lower Layers as a service (Every Layer does its operation and its duel/opposite (vice-versa)), created using OOD (Object-Oriented Design)
      *   <--- HIGHEST LAYER
-     *   - Application layer: Most abstract layer, Interacts with user (ex. UI)
-     *   - Presentation Layer: Modify/Process data to make it useful (ex. en-/de-coding, en-/de-cryption, en-/de-compression)
-     *   - Session Layer: Manages messages over a number of connections (ex. sync, timing, multiplexing, sequencing)
+     *   - Application layer: Most abstract layer, Interacts with user and v.v (ex. UI)
+     *   - Presentation Layer: Modify/Process data to make it useful and v.v (ex. en-/de-coding, en-/de-cryption, en-/de-compression)
+     *   - Session Layer: Manages messages over a number of connections and v.v (ex. sync, timing, multiplexing, sequencing)
      *     - Gets information from Transport layer, using it like a service to get info from Data Link Layer, but does not know how transport layer works
      *   - Transport Layer: first end-to-end Layer, (ex. sockets are transport-layer structures/abstractions)
-     *     - Manages messaging (getting all of message the the other side quickly, reliably, and efficiently)
-     *     - Pieces together information from the Networking Layer and gives it to the session layer requesting information
-     *   - Networking Layer: Determine a route (ex. router)
-     *     - Manages delivery to hosts not directly connected to (builds/maintains routes, relays messages)
+     *     - Manages messaging and v.v (getting all of message the the other side quickly, reliably, and efficiently)
+     *     - Pieces together information from the Networking Layer and gives it to the session layer requesting information and v.v
+     *   - Networking Layer: Determine a route and v.v (ex. router)
+     *     - Manages delivery to hosts not directly connected to and v.v (builds/maintains routes, relays messages)
      *   - Data Link Layer: Point-to-point sending to (ex. switches)
-     *     - Manages delivery to hosts directly connected to (error check/encoding, identity)
+     *     - Manages delivery to hosts directly connected to and v.v (error check/encoding, identity)
      *   - Physical Layer: Manages translation of bits into something physical that propagates, and v.v. (rate, resiliency, bandwidth)
      *   <--- LOWEST LAYER
      *
+     * - OOD (Object Oriented Design)
+     *   - Encapsulation
+     *   - Abstraction
+     *   - Modularity
+     *
      * - Routing
+     *   - Routes implementing using partial 'store and forward'
+     *     - routers forward a message to some machine they are directly connected to that is 'closer' to the target than they are
      *   - IP Address Design
      *     - XXX.X.X.XXX
      *       - The first octet represents a large area
@@ -118,11 +125,22 @@ int main() {
      *       - Regional/Organizational (Big ISP)
      *       - Local (ISP)
      *       - Personal <-- You
-     *     - Routing Names:
-     *       - DNS (Domain Name Service)
-     *         - Service that runs on top of the internet
-     *         - Translates human-readable names into network-usable IP Addresses
-     *           - Dotted Strings??
+     *     - DNS (Domain Name Service)
+     *       - Service that runs on top of the internet
+     *       - Translates human-readable names into network-usable IP Addresses
+     *       - Types of Domain servers
+     *         - root
+     *         - Authoritative name server (ex. rutgers.edu)
+     *         - non-Authoritative name server - not local
+     *       - Locally cached lookups
+     *       - On DNS lookup if not in local cache:
+     *         - recursive: if the name server doesn't know, it checks the next level up
+     *         - non-recursive: if the name server doesn't know, it tell you who to contact (IP addr of next level)
+     *       - "www." world-wide web... canonical sub-domain to represent web servers only
+     *         - (back when you would encode the service you wanted from a domain in the domain name itself)
+     *     - DNS and IP allocation/maintenance
+     *       - IANA (Internet Authority on Naming and Addressing)
+     *       - ICANN (Internet Consortium on Addressing Naming and Numbering)
      *
      * Special File Descriptors Values
      * - STDIN: 0
