@@ -31,11 +31,16 @@ char** getConfig();
 /*
 	Helper Methods
 */
+int directoryExist(char* directoryPath);
 void createDirectories(fileNode* list);
 int makeDirectory(char* directoryName);
 void makeNestedDirectories(char* path);
 char* doubleStringSize(char* word, int newsize);
 void insertLL(fileNode* node);
+void appendToManifest(char* ProjectName, char* token);
+char* createManifestLine(char* version, char* filepath, char* hashcode, int local, int mode);
+char* generateManifestPath(char* projectName);
+void removeFromManifest(char* ProjectName, char* filepath);
 
 /*
 	File Sending Methods
@@ -65,6 +70,10 @@ int main(int argc, char** argv) {
     }else{
     	if(argc == 3){
     		if(strlen(argv[1]) == 8 && strcmp(argv[1], "checkout") == 0){  //checkout
+    			if(directoryExist(argv[2]) == 1){
+    				printf("Fatal Error: Project already exist on client side\n");
+    				return 0;
+    			}
     			int socketfd  = setupConnection();
     			if(socketfd > 0){
     				writeToFile(socketfd, "checkout$");
@@ -160,9 +169,19 @@ int main(int argc, char** argv) {
     			printf("Sucessfully created Configure file in current directory\n");
     			
     		}else if(strlen(argv[1]) == 3 && strcmp(argv[1], "add") == 0){ //Add
-    		
+    			if(directoryExist(argv[2]) == 0){
+    				printf("Fatal Error: Project does not exist to add the file\n");
+    			}else{
+    				char* temp = createManifestLine("1", argv[3], "HASHCODE", 1, 1); //To be implemented
+    				appendToManifest(argv[2], temp);
+    			}
+    			
     		}else if(strlen(argv[1]) == 6 && strcmp(argv[1], "remove") == 0){ //Remove
-    		
+    			if(directoryExist(argv[2]) == 0){
+    				printf("Fatal Error: Project does not exist to remove the file\n");
+    			}else{
+    				removeFromManifest(argv[2], argv[3]);
+    			}
     		}else if(strlen(argv[1]) == 8 && strcmp(argv[1], "rollback") == 0){ //Rollback
     		
     		}else{
@@ -281,17 +300,13 @@ void metadataParser(int clientfd){
 
 /*
 	Automatically creates the Manifest file and calls writeToFileFromSocket to read the socket and store the data in the files
+	Assumes metadataParser was called before to create the listOfFiles
 */
 void createProject(char* directoryName, int socketfd){
 	printf("Attempting to create the directory\n");
 	int success = makeDirectory(directoryName);
 	if(success){
-		char* manifest = malloc(sizeof(char) * strlen(directoryName) + 3 + strlen("/Manifest"));
-		memset(manifest, '\0', sizeof(char) * strlen(directoryName) + 3 + strlen("/Manifest"));
-		manifest[0] = '.';
-		manifest[1] = '/';
-		memcpy(manifest + 2, directoryName, strlen(directoryName));
-		strcat(manifest, "/Manifest");
+		char* manifest = generateManifestPath(directoryName);
 		int fd = open(manifest, O_WRONLY | O_TRUNC | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
 		close(fd);
 		free(manifest);
@@ -435,6 +450,153 @@ void writeToFile(int fd, char* data){
 		bytesWritten += status;
 	}
 }
+
+void removeFromManifest(char* projectName, char* filepath){
+	char* manifest = generateManifestPath(projectName);
+	char* manifestTemp = malloc(sizeof(char) * (strlen(manifest) + 5));
+	memset(manifestTemp, '\0', sizeof(char) * (strlen(manifest) + 5));
+	memcpy(manifestTemp, manifest, strlen(manifest));
+	strcat(manifestTemp, "temp");
+	
+	int manifestfd = open(manifest, O_RDONLY); 
+	
+	if(manifestfd == -1){
+		printf("Fatal Error: The Manifest does not exist!\n");
+		return;
+	}
+	int tempmanifestfd = open(manifestTemp, O_WRONLY | O_TRUNC | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
+	int defaultSize = 25;
+	char* token = malloc(sizeof(char) * (defaultSize + 1));
+	memset(token, '\0', sizeof(char) * (defaultSize + 1));
+	
+	char buffer[125] = {'\0'};
+	int tokenpos = 0;
+	int bufferPos = 0;
+	int read = 0;
+	int found = -1;
+	do{
+		read = bufferFill(manifestfd, buffer, sizeof(buffer));
+		for(bufferPos = 0; bufferPos < sizeof(buffer); ++bufferPos){
+			if(tokenpos >= defaultSize){
+				defaultSize = defaultSize * 2;
+				token = doubleStringSize(token, defaultSize);
+			}
+			token[tokenpos] = buffer[bufferPos];
+			tokenpos++;
+			if(buffer[bufferPos] == '\n'){
+				char* temp = malloc(sizeof(char) * strlen(token));
+				memset(temp, '\0', strlen(token) * sizeof(char));
+				int i = 0;
+				int numofspaces = 0;
+				int temppos = 0;
+				for(i = 0; i < tokenpos; ++i){
+					if(token[i] == ' '){
+						numofspaces++;
+						if(numofspaces == 2){
+							found = strcmp(filepath, temp);
+							break;
+						}
+					}else if(numofspaces == 1){
+						temp[temppos] = token[i];
+						temppos++;
+					}
+				}
+				printf("%s\n", temp);
+				free(temp);
+				if(found != 0){
+					writeToFile(tempmanifestfd, token);
+				}
+				found = -1;
+				free(token);
+				defaultSize = 25;
+				token = malloc(sizeof(char) * (defaultSize + 1));
+				memset(token, '\0', sizeof(char) * (defaultSize + 1));
+				tokenpos = 0;
+			}
+		}
+	}while(buffer[0] != '\0' && read != 0);
+	
+	close(manifestfd);
+	close(tempmanifestfd);
+	remove(manifest);
+	rename(manifestTemp, manifest);
+	free(manifest);
+	free(manifestTemp);
+}
+
+char* generateManifestPath(char* projectName){
+	char* manifest = malloc(sizeof(char) * strlen(projectName) + 3 + strlen("/Manifest"));
+	memset(manifest, '\0', sizeof(char) * strlen(projectName) + 3 + strlen("/Manifest"));
+	manifest[0] = '.';
+	manifest[1] = '/';
+	memcpy(manifest + 2, projectName, strlen(projectName));
+	strcat(manifest, "/Manifest");
+	return manifest;
+}
+
+void appendToManifest(char* projectName, char* token){
+	char* manifest = generateManifestPath(projectName);
+	int fd = open(manifest, O_WRONLY | O_APPEND);
+	if(fd == -1){
+		printf("Fatal Error: Manifest was not found the project file\n");
+	}else{
+		writeToFile(fd, token);
+		close(fd);
+	}
+	free(manifest);
+}
+
+/*
+Local 0: Indicates the file is not just local added
+Local 1: Indicates the file is locally added
+Mode 0: will just create a line of the Manifest given the version/filepath/hashcode
+Mode 1: For 'add', will append l before versionNumber to indicate it was locally added
+Mode 2: For 'remove', will append rl before versionNumber to indicate it was locally removed
+*/
+char* createManifestLine(char* version, char* filepath, char* hashcode, int local, int mode){
+	char* line = NULL;
+	if(local){
+		line = (char*) malloc(sizeof(char) * (strlen(version) + strlen(filepath) + strlen(hashcode) + 6)); // 1 for null terminal, 3 for spaces/ 2 to indicate if it was created locally
+		memset(line, '\0', sizeof(char) * (strlen(version) + strlen(filepath) + strlen(hashcode) + 6));
+	}else{
+		line = (char*) malloc(sizeof(char) * (strlen(version) + strlen(filepath) + strlen(hashcode) + 4));
+		memset(line, '\0', sizeof(char) * (strlen(version) + strlen(filepath) + strlen(hashcode) + 4));
+	}
+	if(mode == 1){
+		char* temp = (char*) malloc(sizeof(char) * (strlen(version) + 2));
+		memset(temp, '\0', sizeof(char) * (strlen(version) + 2));
+		temp[0] = 'l';
+		strcat(temp, version);
+		memcpy(line, temp, strlen(temp));
+		line[strlen(temp)] = ' ';
+		memcpy(line+strlen(temp) + 1, filepath, strlen(filepath));
+		line[strlen(temp) + 1 + strlen(filepath)] = ' ';
+		memcpy(line+strlen(temp) + 1 + strlen(filepath) + 1, hashcode, strlen(hashcode));
+		free(temp);
+	}else if(mode == 2){
+		char* temp = (char*) malloc(sizeof(char) * (strlen(version) + 3));
+		memset(temp, '\0', sizeof(char) * (strlen(version) + 3));
+		temp[0] = 'l';
+		temp[1] = 'r';
+		strcat(temp, version);
+		memcpy(line, temp, strlen(temp));
+		line[strlen(temp)] = ' ';
+		memcpy(line+strlen(temp) + 1, filepath, strlen(filepath));
+		line[strlen(temp) + 1 + strlen(filepath)] = ' ';
+		memcpy(line+strlen(temp) + 1 + strlen(filepath) + 1, hashcode, strlen(hashcode));
+		free(temp);
+	}else{
+		memcpy(line, version, strlen(version));
+		line[strlen(version)] = ' ';
+		memcpy(line+strlen(version) + 1, filepath, strlen(filepath));
+		line[strlen(version) + 1 + strlen(filepath)] = ' ';
+		memcpy(line+strlen(version) + 1 + strlen(filepath) + 1, hashcode, strlen(hashcode));
+	}
+	line[strlen(line)] = '\n';
+	printf("Inserting:%s", line);
+	return line;
+}
+
 void createDirectories(fileNode* list){
 	fileNode* file = list;
 	while(file != NULL){
@@ -457,6 +619,16 @@ int makeDirectory(char* directoryPath){
 	}else{
 		printf("Directory Created\n");
 		return 1;
+	}
+}
+
+int directoryExist(char* directoryPath){
+	DIR* directory = opendir(directoryPath);
+	if(directory != NULL){ //Directory Exists
+		closedir(directory);
+		return 1;
+	}else{ //Directory does not exist or does not have permission to access
+		return 0;
 	}
 }
 

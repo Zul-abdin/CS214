@@ -57,9 +57,12 @@ void makeNestedDirectories(char* path);
 void directoryTraverse(char* path, int mode, int fd);
 void calculateFileBytes(char* fileName, fileNode* file);
 fileNode* createFileNode(char* filepath, char* filename);
-void insertLL(fileNode* node);
 void readManifestFiles(char* projectName, int mode, int clientfd);
+char* createManifestLine(char* version, char* filepath, char* hashcode, int local, int mode);
+void appendToManifest(char* ProjectName, char* token);
+char* generateManifestPath(char* projectName);
 void printFiles();
+void insertLL(fileNode* node);
 /*
 	Command Methods
 */
@@ -260,12 +263,7 @@ void createProject(char* directoryName, int clientfd){
 	printf("Attempting to create the directory\n");
 	int success = makeDirectory(directoryName);
 	if(success){
-		char* manifest = malloc(sizeof(char) * strlen(directoryName) + 3 + strlen("/Manifest"));
-		memset(manifest, '\0', sizeof(char) * strlen(directoryName) + 3 + strlen("/Manifest"));
-		manifest[0] = '.';
-		manifest[1] = '/';
-		memcpy(manifest + 2, directoryName, strlen(directoryName));
-		strcat(manifest, "/Manifest");
+		char* manifest = generateManifestPath(directoryName);
 		int fd = open(manifest, O_WRONLY | O_TRUNC | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
 		createManifest(fd, directoryName);
 		close(fd);
@@ -286,17 +284,21 @@ void createManifest(int fd, char* directorypath){
 	directoryTraverse(directorypath, 0, fd);
 }
 
-/*
-	Read the Manifest and Record all the files as file objects and then read all the files. (Discard file version and data)
-*/
-void readManifestFiles(char* projectName, int mode, int clientfd){
+char* generateManifestPath(char* projectName){
 	char* manifest = malloc(sizeof(char) * strlen(projectName) + 3 + strlen("/Manifest"));
 	memset(manifest, '\0', sizeof(char) * strlen(projectName) + 3 + strlen("/Manifest"));
 	manifest[0] = '.';
 	manifest[1] = '/';
 	memcpy(manifest + 2, projectName, strlen(projectName));
 	strcat(manifest, "/Manifest");
-	
+	return manifest;
+}
+
+/*
+	Mode: 0 Read the Manifest and Record all the files as file objects and then read all the files. (Discard file version and hashcode)
+*/
+void readManifestFiles(char* projectName, int mode, int clientfd){
+	char* manifest = generateManifestPath(projectName);
 	numOfFiles = 0;
 	int manifestfd = open(manifest, O_RDONLY);
 	if(manifestfd == -1){
@@ -515,8 +517,8 @@ void sendFile(int clientfd, char* filepath){
 
 /*
 Mode 0: Traverse through and add to manifest (the fd)
-Mode 1: Traverse through the directories and create fileNodes
-Mode 2: Traverse through the directories and for each file, send to Client (Note* you should run MODE 1 to setup the Metadata of all these files)
+Mode 1: Traverse through the directories and create fileNodes (to be implemented)
+Mode 2: Traverse through the directories and for each file, send to Client (Note* you should run MODE 1 to setup the Metadata of all these files) (to be implemented)
 */
 void directoryTraverse(char* path, int mode, int fd){ 
 	DIR* dirPath = opendir(path);
@@ -535,11 +537,9 @@ void directoryTraverse(char* path, int mode, int fd){
 			char* filepath = pathCreator(path, curFile->d_name);
 			printf("File path: %s\n", filepath);
 			if(mode == 0 && strcmp(curFile->d_name, "Manifest") != 0){
-				writeToFile(fd, "1 "); //File version number
-				writeToFile(fd, filepath); //Path to file
-				writeToFile(fd, " "); //Delimiter
-				writeToFile(fd, "HASHCODE"); //HashCode
-				writeToFile(fd, "\n"); //Newline to indicate this file is inserted in the manifest
+				char* temp = createManifestLine("1", filepath, "HASHCODE", 0, 0);
+				writeToFile(fd, temp);
+				free(temp);
 			}else if(mode == 1 && strcmp(curFile->d_name, "Manifest") != 0){
 				
 			}
@@ -554,6 +554,75 @@ void directoryTraverse(char* path, int mode, int fd){
 	}
 	closedir(dirPath);
 }
+
+void appendToManifest(char* ProjectName, char* token){
+	char* manifest = generateManifestPath(ProjectName);
+	int fd = open(manifest, O_WRONLY | O_APPEND);
+	if(fd == -1){
+		printf("Fatal Error: Manifest was not found the project file\n");
+		return;
+	}
+	/* off_t eof = lseek(fd, 0, SEEK_END);
+	if(eof == -1){
+		printf("Error: lseek could not find the end of the file\n");
+		return;
+	}else{
+	}
+	*/
+	writeToFile(fd, token);	
+}
+
+/*
+Local 0: Indicates the file is not just local added
+Local 1: Indicates the file is locally added
+Mode 0: will just create a line of the Manifest given the version/filepath/hashcode
+Mode 1: For 'add', will append l before versionNumber to indicate it was locally added
+Mode 2: For 'remove', will append rl before versionNumber to indicate it was locally removed
+*/
+char* createManifestLine(char* version, char* filepath, char* hashcode, int local, int mode){
+	char* line = NULL;
+	if(local){
+		line = (char*) malloc(sizeof(char) * (strlen(version) + strlen(filepath) + strlen(hashcode) + 6)); // 1 for null terminal, 3 for spaces/ 2 to indicate if it was created locally
+		memset(line, '\0', sizeof(char) * (strlen(version) + strlen(filepath) + strlen(hashcode) + 6));
+	}else{
+		line = (char*) malloc(sizeof(char) * (strlen(version) + strlen(filepath) + strlen(hashcode) + 4));
+		memset(line, '\0', sizeof(char) * (strlen(version) + strlen(filepath) + strlen(hashcode) + 4));
+	}
+	if(mode == 1){
+		char* temp = (char*) malloc(sizeof(char) * (strlen(version) + 2));
+		memset(temp, '\0', sizeof(char) * (strlen(version) + 2));
+		temp[0] = 'l';
+		strcat(temp, version);
+		memcpy(line, temp, strlen(temp));
+		line[strlen(temp)] = ' ';
+		memcpy(line+strlen(temp) + 1, filepath, strlen(filepath));
+		line[strlen(temp) + 1 + strlen(filepath)] = ' ';
+		memcpy(line+strlen(temp) + 1 + strlen(filepath) + 1, hashcode, strlen(hashcode));
+		free(temp);
+	}else if(mode == 2){
+		char* temp = (char*) malloc(sizeof(char) * (strlen(version) + 3));
+		memset(temp, '\0', sizeof(char) * (strlen(version) + 3));
+		temp[0] = 'l';
+		temp[1] = 'r';
+		strcat(temp, version);
+		memcpy(line, temp, strlen(temp));
+		line[strlen(temp)] = ' ';
+		memcpy(line+strlen(temp) + 1, filepath, strlen(filepath));
+		line[strlen(temp) + 1 + strlen(filepath)] = ' ';
+		memcpy(line+strlen(temp) + 1 + strlen(filepath) + 1, hashcode, strlen(hashcode));
+		free(temp);
+	}else{
+		memcpy(line, version, strlen(version));
+		line[strlen(version)] = ' ';
+		memcpy(line+strlen(version) + 1, filepath, strlen(filepath));
+		line[strlen(version) + 1 + strlen(filepath)] = ' ';
+		memcpy(line+strlen(version) + 1 + strlen(filepath) + 1, hashcode, strlen(hashcode));
+	}
+	line[strlen(line)] = '\n';
+	printf("Inserting:%s", line);
+	return line;
+}
+
 
 void writeToFile(int fd, char* data){
 	int bytesToWrite = strlen(data);
