@@ -9,6 +9,7 @@
 #include <sys/socket.h>
 #include <errno.h>
 #include <signal.h>
+#include <openssl/md5.h>
 #include <libgen.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -54,7 +55,7 @@ char* doubleStringSize(char* word, int newsize);
 char* pathCreator(char* path, char* name);
 int makeDirectory(char* directoryName);
 void makeNestedDirectories(char* path);
-void directoryTraverse(char* path, int mode, int fd);
+int directoryTraverse(char* path, int mode, int fd);
 void calculateFileBytes(char* fileName, fileNode* file);
 fileNode* createFileNode(char* filepath, char* filename);
 void readManifestFiles(char* projectName, int mode, int clientfd);
@@ -63,12 +64,14 @@ void appendToManifest(char* ProjectName, char* token);
 char* generateManifestPath(char* projectName);
 void printFiles();
 void insertLL(fileNode* node);
+char* generateHashCode(char* filepath);
 /*
 	Command Methods
 */
 void createProject(char* directoryName, int clientfd);
 void getProjectVersion(char* directoryName, int clientfd);
 void createManifest(int fd, char* directorypath);
+void destroyProject(char* directoryName, int clientfd);
 
 fileNode* listOfFiles = NULL;
 int numOfFiles = 0;
@@ -116,7 +119,7 @@ void metadataParser(int clientfd){
 	int tokenpos = 0;
 	int fileLength = 0;
 	int filesRead = 0;
-	int fileName = 0; //Could change this to a linked list of file names or an array of file names
+	int fileName = 0; s
 	listOfFiles = NULL;
 	fileNode* file = NULL;
 	char* mode = NULL;
@@ -126,6 +129,14 @@ void metadataParser(int clientfd){
 			if(mode == NULL){
 				mode = token;
 				printf("%s\n", mode);
+			}else if(strcmp(mode, "destroy") == 0){
+				printf("Reading the project to destroy\n");
+				fileLength = atoi(token);
+				free(token);
+				char* temp = NULL;
+				readNbytes(clientfd, fileLength, NULL, &temp);
+				destroyProject(temp, clientfd);
+				free(temp);
 			}else if(strcmp(mode, "checkout") == 0){
 				printf("Reading the project to check out\n");
 				fileLength = atoi(token);
@@ -278,6 +289,18 @@ void createProject(char* directoryName, int clientfd){
 	}
 }
 
+void destroyProject(char* directoryName, int clientfd){
+	int success = directoryTraverse(directoryName, 3, -1);
+	int curDirectory = remove(directoryName);
+	if(success == 1 && curDirectory != -1){
+		printf("Server destroyed the project, sending client success message\n");
+		writeToFile(clientfd, "SUCCESS");
+	}else{
+		printf("Server failed to destroy the project, sending error to client\n");
+		writeToFile(clientfd, "FAILURE");
+	}
+}
+
 void createManifest(int fd, char* directorypath){
 	writeToFile(fd, "1");
 	writeToFile(fd, "\n");
@@ -415,7 +438,7 @@ void getProjectVersion(char* directoryName, int clientfd) {
 						token[tokenpos] = buffer[bufferPos];
 						tokenpos++;
 						numOfSpaces = 0;
-		     		} 
+		     		}
 		     }else{
 		     		if(buffer[bufferPos] == ' '){
 		     			numOfSpaces++;
@@ -519,12 +542,13 @@ void sendFile(int clientfd, char* filepath){
 Mode 0: Traverse through and add to manifest (the fd)
 Mode 1: Traverse through the directories and create fileNodes (to be implemented)
 Mode 2: Traverse through the directories and for each file, send to Client (Note* you should run MODE 1 to setup the Metadata of all these files) (to be implemented)
+Mode 3: Traverse through the directories and delete all directories
 */
-void directoryTraverse(char* path, int mode, int fd){ 
+int directoryTraverse(char* path, int mode, int fd){ 
 	DIR* dirPath = opendir(path);
 	if(!dirPath){
-		printf("Fatal Error: Directory path does not exist or no valid permissions!\n");
-		return;
+		printf("Error: Directory path does not exist or no valid permissions!\n");
+		return -1;
 	}
 	struct dirent* curFile = readdir(dirPath);
 	while(curFile != NULL){
@@ -537,23 +561,74 @@ void directoryTraverse(char* path, int mode, int fd){
 			char* filepath = pathCreator(path, curFile->d_name);
 			printf("File path: %s\n", filepath);
 			if(mode == 0 && strcmp(curFile->d_name, "Manifest") != 0){
-				char* temp = createManifestLine("1", filepath, "HASHCODE", 0, 0);
+				char* hashcode = generateHashCode(filepath);
+				char* temp = createManifestLine("1", filepath, hashcode, 0, 0);
 				writeToFile(fd, temp);
 				free(temp);
+				free(hashcode);
 			}else if(mode == 1 && strcmp(curFile->d_name, "Manifest") != 0){
 				
+			}else if(mode == 3){
+				int success = remove(filepath);
+				if(success == -1){
+					printf("Error: File %s could not be deleted\n", filepath);
+				}
 			}
 			free(filepath);
 		}else if(curFile->d_type == DT_DIR){
 			char* directorypath = pathCreator(path, curFile->d_name);
-			directoryTraverse(directorypath, mode, fd);
+			if(mode == 3){
+				directoryTraverse(directorypath, mode, fd);
+				remove(directorypath);
+			}else{
+				directoryTraverse(directorypath, mode, fd);
+			}
+			free(directorypath);
 		}else{
 			
 		}
 		curFile = readdir(dirPath);
 	}
 	closedir(dirPath);
+	return 1;
 }
+
+
+char* generateHashCode(char* filepath){
+	int filefd = open(filepath, O_RDONLY);
+	if(filefd == -1){
+		printf("Fatal Error: File does not exist to generate a hashcode\n");
+		return NULL;
+	}else{
+		char* hash = (char *) malloc(sizeof(char) * (MD5_DIGEST_LENGTH + 1));	
+		memset(hash, '\0', sizeof(char) * (MD5_DIGEST_LENGTH + 1));
+		char buffer[1024] = {'\0'};
+		int read = 0;
+		MD5_CTX mdHash;
+		MD5_Init (&mdHash);
+		do{
+			read = bufferFill(filefd, buffer, sizeof(buffer));
+			MD5_Update(&mdHash, buffer, read);
+		}while(buffer[0] != '\0' && read != 0);
+		MD5_Final (hash, &mdHash);
+		int i = 0;
+		printf("The hash for this file is: ");
+		for(i = 0; i < MD5_DIGEST_LENGTH; i++){
+			printf("%02x", (unsigned char) hash[i]);
+		}
+		printf("\n");
+		char* hexhash = (char *) malloc(sizeof(char) * ((strlen(hash) * 2) + 1));
+		memset(hexhash, '\0', sizeof(char) * ((strlen(hash) * 2) + 1));
+		int previous = 0;
+		for(i = 0; i < strlen(hash); ++i){
+			sprintf( (char*) (hexhash + previous), "%02x", (unsigned char) hash[i]); //Each characters takes up 2 bytes now (hexadecimal value)
+			previous += 2;
+		}
+		free(hash);
+		return hexhash;
+	}
+}
+
 
 void appendToManifest(char* ProjectName, char* token){
 	char* manifest = generateManifestPath(ProjectName);
@@ -562,13 +637,6 @@ void appendToManifest(char* ProjectName, char* token){
 		printf("Fatal Error: Manifest was not found the project file\n");
 		return;
 	}
-	/* off_t eof = lseek(fd, 0, SEEK_END);
-	if(eof == -1){
-		printf("Error: lseek could not find the end of the file\n");
-		return;
-	}else{
-	}
-	*/
 	writeToFile(fd, token);	
 }
 
@@ -676,7 +744,6 @@ fileNode* createFileNode(char* filepath, char* filename){
 	newNode->next = NULL;
 	newNode->prev = NULL;
 }
-
 
 
 /*

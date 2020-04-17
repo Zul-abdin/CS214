@@ -7,6 +7,7 @@
 #include <dirent.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <openssl/md5.h>
 #include <libgen.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -41,6 +42,7 @@ void appendToManifest(char* ProjectName, char* token);
 char* createManifestLine(char* version, char* filepath, char* hashcode, int local, int mode);
 char* generateManifestPath(char* projectName);
 void removeFromManifest(char* ProjectName, char* filepath);
+char* generateHashCode(char* filepath);
 
 /*
 	File Sending Methods
@@ -125,7 +127,24 @@ int main(int argc, char** argv) {
 				
 				}
     		}else if(strlen(argv[1]) == 7 && strcmp(argv[1], "destroy") == 0){ //destroy
-    			
+    			int socketfd = setupConnection();
+				if(socketfd > 0){
+					writeToFile(socketfd, "destroy$");
+					sendLength(socketfd, argv[2]);
+					char* temp = NULL;
+					readNbytes(socketfd, strlen("FAILURE"), NULL, &temp);
+					if(strcmp(temp, "SUCCESS") == 0){
+						printf("Server sucessfully destroyed the project\n");
+					}else if(strcmp(temp , "FAILURE") == 0){
+						printf("Fatal Error: Server failed to destroy the project\n");
+					}else{
+						printf("Fatal Error: Could not interpret the server's response\n");
+					}
+					free(temp);
+					close(socketfd);
+				}else{
+				
+				}
     		}else if(strlen(argv[1]) == 14 && strcmp(argv[1], "currentversion") == 0){ //currentversion
 				int socketfd = setupConnection();
 				if(socketfd > 0){
@@ -172,8 +191,16 @@ int main(int argc, char** argv) {
     			if(directoryExist(argv[2]) == 0){
     				printf("Fatal Error: Project does not exist to add the file\n");
     			}else{
-    				char* temp = createManifestLine("1", argv[3], "HASHCODE", 1, 1); //To be implemented
-    				appendToManifest(argv[2], temp);
+    				char* hashcode = generateHashCode(argv[3]);
+    				if(hashcode == NULL){
+    					
+    				}else{
+		 				char* temp = createManifestLine("1", argv[3], hashcode, 1, 1); 
+		 				appendToManifest(argv[2], temp);
+		 				free(hashcode);
+		 				free(temp);
+    				}
+    				
     			}
     			
     		}else if(strlen(argv[1]) == 6 && strcmp(argv[1], "remove") == 0){ //Remove
@@ -464,7 +491,10 @@ void removeFromManifest(char* projectName, char* filepath){
 		printf("Fatal Error: The Manifest does not exist!\n");
 		return;
 	}
-	int tempmanifestfd = open(manifestTemp, O_WRONLY | O_TRUNC | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
+	int tempmanifestfd = open(manifestTemp, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
+	if(tempmanifestfd == -1){
+		printf("File already exists somehow\n");
+	}
 	int defaultSize = 25;
 	char* token = malloc(sizeof(char) * (defaultSize + 1));
 	memset(token, '\0', sizeof(char) * (defaultSize + 1));
@@ -474,6 +504,7 @@ void removeFromManifest(char* projectName, char* filepath){
 	int bufferPos = 0;
 	int read = 0;
 	int found = -1;
+	int existed = -1;
 	do{
 		read = bufferFill(manifestfd, buffer, sizeof(buffer));
 		for(bufferPos = 0; bufferPos < sizeof(buffer); ++bufferPos){
@@ -494,6 +525,9 @@ void removeFromManifest(char* projectName, char* filepath){
 						numofspaces++;
 						if(numofspaces == 2){
 							found = strcmp(filepath, temp);
+							if(found == 0){
+								existed = 1;
+							}
 							break;
 						}
 					}else if(numofspaces == 1){
@@ -518,10 +552,16 @@ void removeFromManifest(char* projectName, char* filepath){
 	
 	close(manifestfd);
 	close(tempmanifestfd);
-	remove(manifest);
-	rename(manifestTemp, manifest);
+	if(existed == -1){
+		printf("Warning: The file is not listed in the Manifest\n");
+		int success = remove(manifestTemp);
+		printf("%d\n", success);
+	}else{
+		remove(manifest);
+		rename(manifestTemp, manifest);
+	}
 	free(manifest);
-	free(manifestTemp);
+	free(manifestTemp);	
 }
 
 char* generateManifestPath(char* projectName){
@@ -596,6 +636,42 @@ char* createManifestLine(char* version, char* filepath, char* hashcode, int loca
 	printf("Inserting:%s", line);
 	return line;
 }
+
+char* generateHashCode(char* filepath){
+	int filefd = open(filepath, O_RDONLY);
+	if(filefd == -1){
+		printf("Fatal Error: File does not exist to generate a hashcode\n");
+		return NULL;
+	}else{
+		char* hash = (char *) malloc(sizeof(char) * (MD5_DIGEST_LENGTH + 1));	
+		memset(hash, '\0', sizeof(char) * (MD5_DIGEST_LENGTH + 1));
+		char buffer[1024] = {'\0'};
+		int read = 0;
+		MD5_CTX mdHash;
+		MD5_Init (&mdHash);
+		do{
+			read = bufferFill(filefd, buffer, sizeof(buffer));
+			MD5_Update(&mdHash, buffer, read);
+		}while(buffer[0] != '\0' && read != 0);
+		MD5_Final (hash, &mdHash);
+		int i = 0;
+		printf("The hash for this file is: ");
+		for(i = 0; i < MD5_DIGEST_LENGTH; i++){
+			printf("%02x", (unsigned char) hash[i]);
+		}
+		printf("\n");
+		char* hexhash = (char *) malloc(sizeof(char) * ((strlen(hash) * 2) + 1));
+		memset(hexhash, '\0', sizeof(char) * ((strlen(hash) * 2) + 1));
+		int previous = 0;
+		for(i = 0; i < strlen(hash); ++i){
+			sprintf( (char*) (hexhash + previous), "%02x", (unsigned char) hash[i]); //Each characters takes up 2 bytes now (hexadecimal value)
+			previous += 2;
+		}
+		free(hash);
+		return hexhash;
+	}
+}
+
 
 void createDirectories(fileNode* list){
 	fileNode* file = list;

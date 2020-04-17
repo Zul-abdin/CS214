@@ -3,7 +3,7 @@ all:	main
 main:	bin/client.out bin/server.out
 
 bin/%.out:	%.c | bin
-	gcc $< -o $@
+	gcc -lssl -lcrypto $< -o $@
 
 bin:
 	mkdir -p $@
