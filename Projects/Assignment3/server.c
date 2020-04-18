@@ -11,6 +11,7 @@
 #include <signal.h>
 #include <openssl/md5.h>
 #include <libgen.h>
+#include <pthread.h>
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -22,6 +23,11 @@ typedef struct _fileNode_{
 	struct _fileNode_* prev;
 }fileNode;
 
+typedef struct _userNode_{
+	pthread_t thread;
+	struct _userNode_* next;
+}userNode;
+
 /*
 	Clean up Methods
 */
@@ -32,11 +38,10 @@ void unloadMemory();
 	Setup Server Methods
 */
 int setupServer(int socketfd, int port);
-
 /*
 	File Recieving Methods:
 */
-void metadataParser(int clientfd);
+void* metadataParser(void* clientfdptr);
 int bufferFill(int fd, char* buffer, int bytesToRead);
 void readNbytes(int fd, int length,char* mode ,char** placeholder);
 
@@ -65,6 +70,7 @@ char* generateManifestPath(char* projectName);
 void printFiles();
 void insertLL(fileNode* node);
 char* generateHashCode(char* filepath);
+void insertThreadLL(pthread_t node);
 /*
 	Command Methods
 */
@@ -72,6 +78,8 @@ void createProject(char* directoryName, int clientfd);
 void getProjectVersion(char* directoryName, int clientfd);
 void createManifest(int fd, char* directorypath);
 void destroyProject(char* directoryName, int clientfd);
+
+userNode* pthreadHead = NULL;
 
 fileNode* listOfFiles = NULL;
 int numOfFiles = 0;
@@ -99,9 +107,11 @@ int main(int argc, char** argv){
 						printf("Error: Refused Connection\n");
 					}else{
 						printf("Successfully: Accepted Connection\n");
-						metadataParser(clientfd);
+						printf("Creating the thread to run this connection\n");
+						pthread_t client = NULL;
+						pthread_create(&client, NULL, metadataParser, &clientfd);
+						insertThreadLL(client);
 					}
-					close(clientfd);
 				}
 			}
 		}
@@ -109,7 +119,21 @@ int main(int argc, char** argv){
 	return 0;
 }
 
-void metadataParser(int clientfd){
+void insertThreadLL(pthread_t node){
+	userNode* newNode = malloc(sizeof(userNode) * 1);
+	newNode->thread = node;
+	newNode->next = NULL;
+	
+	if(pthreadHead == NULL){
+		pthreadHead = newNode;
+	}else{
+		newNode->next = pthreadHead;
+		pthreadHead = newNode;
+	}
+}
+
+void* metadataParser(void* clientfdptr){
+	int clientfd = *((int*) clientfdptr);
 	char buffer[1] = {'\0'}; 
 	int defaultSize = 15;
 	char* token = malloc(sizeof(char) * (defaultSize + 1));
@@ -119,7 +143,7 @@ void metadataParser(int clientfd){
 	int tokenpos = 0;
 	int fileLength = 0;
 	int filesRead = 0;
-	int fileName = 0; s
+	int fileName = 0;
 	listOfFiles = NULL;
 	fileNode* file = NULL;
 	char* mode = NULL;
@@ -221,6 +245,7 @@ void metadataParser(int clientfd){
 			tokenpos++;
 		}
 	}while(buffer[0] != '\0' && read != 0);
+	pthread_exit(NULL);
 }
 void printFiles(){
 	fileNode* temp = listOfFiles;
@@ -280,7 +305,7 @@ void createProject(char* directoryName, int clientfd){
 		close(fd);
 		printf("Sending the Manifest to Client\n");
 		writeToFile(clientfd, "SUCCESS");
-		fileNode* manifestNode = createFileNode(manifest, "Manifest");
+		fileNode* manifestNode = createFileNode(manifest, strdup("Manifest"));
 		sendFilesToClient(clientfd, manifestNode, 1);
 		free(manifest);
 	}else{
@@ -331,7 +356,7 @@ void readManifestFiles(char* projectName, int mode, int clientfd){
 		writeToFile(clientfd, "SUCCESS");
 		printf("Searching the Manifest for the list of all files\n");
 		numOfFiles++;
-		fileNode* ManifestNode = createFileNode(manifest, "Manifest");
+		fileNode* ManifestNode = createFileNode(manifest, strdup("Manifest"));
 		insertLL(ManifestNode);
 		
 		char buffer[100] = {'\0'};
@@ -363,7 +388,7 @@ void readManifestFiles(char* projectName, int mode, int clientfd){
 		    		numOfSpaces++;
 		    		if(numOfSpaces == 2){
 		    			char* temp = strdup(token);
-		    			char* filename = basename(temp);
+		    			char* filename = strdup(basename(temp));
 		    			printf("The filepath is:%s\n",token);
 		    			fileNode* newFile = createFileNode(token, filename);
 		    			insertLL(newFile);
@@ -505,7 +530,7 @@ void sendFilesToClient(int clientfd, fileNode* files, int numOfFiles){
 			sendFile(clientfd, file->filepath);
 		}else{
 			char* temp = (char*) malloc(sizeof(char) * strlen(file->filepath) + 3);
-			memset(temp, '\0', strlen(file->filepath) + 3);
+			memset(temp, '\0', sizeof(char) * strlen(file->filepath) + 3);
 			temp[0] = '.';
 			temp[1] = '/';
 			memcpy(temp+2, file->filepath, strlen(file->filepath));
@@ -825,4 +850,17 @@ void sighandler(int sig){
 
 void unloadMemory(){
 	printf("Deallocing structures and closing file descriptors\n");
+	while(listOfFiles != NULL){
+		free(listOfFiles->filename);
+		free(listOfFiles->filepath);
+		fileNode* temp = listOfFiles;
+		listOfFiles = listOfFiles->next;
+		free(temp);
+	}
+	while(pthreadHead != NULL){
+		pthread_join(pthreadHead->thread, NULL);
+		userNode* temp = pthreadHead;
+		pthreadHead = pthreadHead->next;
+		free(temp);
+	}
 }
