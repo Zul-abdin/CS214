@@ -30,6 +30,11 @@ int setupConnection();
 char** getConfig();
 
 /*
+	Cleanup Methods
+*/
+void freeFileNodes();
+
+/*
 	Helper Methods
 */
 int directoryExist(char* directoryPath);
@@ -216,6 +221,7 @@ int main(int argc, char** argv) {
     		}
     	}
     }
+    freeFileNodes();
     return 0;
 }
 
@@ -297,6 +303,7 @@ void metadataParser(int clientfd){
 					readName = 0;
 				}
 				if(numOfFiles == filesRead){
+					free(file);
 					fileNode* temp = listOfFiles;
 					while(temp != NULL){
 						printf("File: %s\n", temp->filename);
@@ -368,7 +375,7 @@ void readNbytes(int fd, int length, char* mode, char** placeholder){
 				read = bufferFill(fd, buffer, length);
 			}
 		}
-		if(mode == NULL){
+		if(mode == NULL && placeholder != NULL){
 			for(bufferPos = 0; bufferPos < read; ++bufferPos){
 			if(tokenpos >= defaultSize){
 				defaultSize = defaultSize * 2;
@@ -382,10 +389,10 @@ void readNbytes(int fd, int length, char* mode, char** placeholder){
 		}
 		length = length - read;
 	}while(buffer[0] != '\0' && read != 0);
-	if(mode == NULL && placeholder == NULL){
-		printf("%s", buffer);
-	}else if(mode == NULL){
+	if(mode == NULL && placeholder != NULL){
 		*placeholder = token;
+	}else if(mode == NULL && placeholder == NULL){
+		free(token);
 	}
 }
 
@@ -560,6 +567,7 @@ void removeFromManifest(char* projectName, char* filepath){
 		remove(manifest);
 		rename(manifestTemp, manifest);
 	}
+	free(token);
 	free(manifest);
 	free(manifestTemp);	
 }
@@ -744,8 +752,11 @@ int setupConnection(){
 	char** information = getConfig();
 	if(information != NULL){
    	int socketfd = createSocket();
-   	if(socketfd != -1){
-	  		connectToServer(socketfd, information);
+   	if(socketfd >= 0){
+	  		if(connectToServer(socketfd, information) == -1){
+	  			close(socketfd);
+	  			socketfd = -1;
+	  		}
 	  	}
 		free(information[0]);
 		free(information[1]);
@@ -759,15 +770,14 @@ int createSocket(){
 	int socketfd = socket(AF_INET, SOCK_STREAM, 0);
 	if(socketfd < 0){
 		printf("Fatal Error: Could not open socket\n");
-		return -1;
 	}
 	return socketfd;
 }
 
 int connectToServer(int socketfd, char** serverinfo){
-	struct hostent* ip = gethostbyname(serverinfo[0]);
+	struct hostent* ip = gethostbyname(serverinfo[0]); //Not sure how to handle this, stuff isn't being freed here
 	if(ip == NULL){
-		printf("Fatal Error: IP does not exist\n");
+		printf("Fatal Error: Could not locate IP address\n");
 		return -1;
 	}
 	struct sockaddr_in serverinfostruct;
@@ -787,9 +797,6 @@ int connectToServer(int socketfd, char** serverinfo){
 	return -1;
 }
 
-int generateHash(char* seed){
-	//TO BE IMPLEMENTED
-}
 /*
 Returns a char** that contains:
 	1st Element = IP
@@ -835,6 +842,18 @@ char** getConfig(){
 		}
 	}while((buffer[0] != '\0' && finished == 0) && read != 0);
 	return information;
+}
+
+
+void freeFileNodes(){
+	while(listOfFiles != NULL){
+		free(listOfFiles->filename);
+		free(listOfFiles->filepath);
+		fileNode* temp = listOfFiles;
+		listOfFiles = listOfFiles->next;
+		free(temp);
+	}
+	listOfFiles = NULL;
 }
 
 char* doubleStringSize(char* word, int newsize){

@@ -33,7 +33,7 @@ typedef struct _userNode_{
 */
 void sighandler(int sig);
 void unloadMemory();
-
+void freeFileNodes();
 /*
 	Setup Server Methods
 */
@@ -245,6 +245,14 @@ void* metadataParser(void* clientfdptr){
 			tokenpos++;
 		}
 	}while(buffer[0] != '\0' && read != 0);
+	if(mode != NULL){
+		free(mode);
+	}
+	if(token != NULL){
+		free(token);
+	}
+	freeFileNodes();
+	numOfFiles = 0;
 	pthread_exit(NULL);
 }
 void printFiles(){
@@ -307,7 +315,7 @@ void createProject(char* directoryName, int clientfd){
 		writeToFile(clientfd, "SUCCESS");
 		fileNode* manifestNode = createFileNode(manifest, strdup("Manifest"));
 		sendFilesToClient(clientfd, manifestNode, 1);
-		free(manifest);
+		listOfFiles = manifestNode;
 	}else{
 		printf("Directory Failed to Create: Sending Error to Client\n");
 		writeToFile(clientfd, "FAILURE");
@@ -453,7 +461,7 @@ void getProjectVersion(char* directoryName, int clientfd) {
 		     			
 		     			tokenpos = 0;
 		     			defaultSize = 25;
-		     			char *token = malloc(sizeof(char) * (defaultSize + 1));
+		     			token = malloc(sizeof(char) * (defaultSize + 1));
    					memset(token, '\0', sizeof(char) * (defaultSize + 1));
 		     		}else{
 		     			if(tokenpos >= defaultSize){ 
@@ -485,7 +493,7 @@ void getProjectVersion(char* directoryName, int clientfd) {
     printf("Sending the Client: %s\n", token);
     writeToFile(clientfd, "output$");
 	 char str[3] = {'\0'};
-	 sprintf(str, "%d", tokenpos);
+	 sprintf(str, "%d", strlen(token));
 	 writeToFile(clientfd, str);
 	 writeToFile(clientfd, "$");
 	 writeToFile(clientfd, token);
@@ -768,6 +776,7 @@ fileNode* createFileNode(char* filepath, char* filename){
 	calculateFileBytes(filepath, newNode);
 	newNode->next = NULL;
 	newNode->prev = NULL;
+	return newNode;
 }
 
 
@@ -846,6 +855,17 @@ void insertLL(fileNode* node){
 
 void sighandler(int sig){
 	exit(0);
+}
+
+void freeFileNodes(){
+	while(listOfFiles != NULL){
+		free(listOfFiles->filename);
+		free(listOfFiles->filepath);
+		fileNode* temp = listOfFiles;
+		listOfFiles = listOfFiles->next;
+		free(temp);
+	}
+	listOfFiles = NULL;
 }
 
 void unloadMemory(){
