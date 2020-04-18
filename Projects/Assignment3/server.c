@@ -108,7 +108,7 @@ int main(int argc, char** argv){
 					}else{
 						printf("Successfully: Accepted Connection\n");
 						printf("Creating the thread to run this connection\n");
-						pthread_t client = NULL;
+						pthread_t client = (pthread_t) NULL;
 						pthread_create(&client, NULL, metadataParser, &clientfd);
 						insertThreadLL(client);
 					}

@@ -1,15 +1,22 @@
 all:	main
 
-main:	bin/client.out bin/server.out
+main:	bin-client/client.out bin-server/server.out
 
-bin/%.out:	%.c | bin
-	gcc -lssl -lcrypto $< -o $@
+bin-server/%.out:	%.c | bin-server
+	gcc $< -o $@ -lssl -lcrypto -lpthread
 
-bin:
+bin-client/%.out:	%.c | bin-client
+	gcc $< -o $@ -lssl -lcrypto
+
+bin-server:
+	mkdir -p $@
+
+bin-client:
 	mkdir -p $@
 
 %.out:	%.c
 	gcc $< -o $@
 
 clean:
-	rm -rf bin
+	rm -rf bin-server
+	rm -rf bin-client
