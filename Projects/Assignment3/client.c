@@ -21,6 +21,14 @@ typedef struct _fileNode_{
 	struct _fileNode_* prev;
 }fileNode;
 
+typedef struct _manifestNodes_{
+	char* filepath;
+	char* version;
+	char* hash;
+	struct _manifestNodes_* next;
+	struct _manifestNodes_* prev;
+}mNode;
+
 /*
 	Client Setup Methods
 */
@@ -48,7 +56,8 @@ char* createManifestLine(char* version, char* filepath, char* hashcode, int loca
 char* generateManifestPath(char* projectName);
 void removeFromManifest(char* ProjectName, char* filepath);
 char* generateHashCode(char* filepath);
-
+mNode* insertMLL(mNode* newNode, mNode* head);
+void printMLL(mNode* head);
 /*
 	File Sending Methods
 */
@@ -67,6 +76,7 @@ int bufferFill(int fd, char* buffer, int bytesToRead);
 	Commands Methods
 */
 void createProject(char* directoryName, int socketfd);
+void update(char* ProjectName, int socketfd);
 
 fileNode* listOfFiles = NULL;
 int numOfFiles = 0;
@@ -111,7 +121,8 @@ int main(int argc, char** argv) {
     				readNbytes(socketfd, strlen("FAILURE"), NULL, &temp);
     				if(strcmp(temp, "SUCCESS") == 0){
     					printf("Server sucessfully located the project's manifest, recieving the server manifest\n");
-    					
+    					metadataParser(socketfd);
+    					update(argv[2], socketfd);
     				}else if(strcmp(temp , "FAILURE") == 0){
     					printf("Error: Server failed to locate the project's manifest\n");
     				}else{
@@ -366,7 +377,9 @@ void createProject(char* directoryName, int socketfd){
 		printf("Client: Directory Failed to Create\n");
 	}
 }
-
+/*
+	Assuming MetadataParser is filled
+*/
 void update(char* ProjectName, int socketfd){
 	char* manifest = generateManifestPath(ProjectName);
 	int manifestfd = open(manifest, O_RDONLY);
@@ -374,10 +387,161 @@ void update(char* ProjectName, int socketfd){
 		printf("Fatal Error: Manifest does not exist or does not have permissions to be opened\n");
 		return;
 	}
-	/*Implement Manifest checking*/
+	char buffer[100] = {'\0'};
+   int defaultSize = 15;
+
+    
+   int read = 0;
+   int tokenpos = 0;
+   int bufferPos = 0;
+   int numOfSpaces = 0;
+    
+   int manifestVersion = 0;
+   
+   char* serverVersion = malloc(sizeof(char) * (defaultSize + 1));
+   memset(serverVersion, '\0', sizeof(char) * (defaultSize + 1));
+   int length = listOfFiles->filelength;
+   int sameVersion = 0;
+   
+   mNode* serverHead = NULL;
+   mNode* clientHead = NULL;
+   mNode* curLine = malloc(sizeof(mNode) * 1);
+   
+   do{
+		read = bufferFill(socketfd, buffer, 1);
+		length = length - read;
+		if(buffer[0] == '\n'){
+			break;
+		}
+   	if(tokenpos >= defaultSize){
+			defaultSize = defaultSize * 2;
+			serverVersion = doubleStringSize(serverVersion, defaultSize);
+		}
+		serverVersion[tokenpos] = buffer[0];
+		tokenpos++;
+   }while(read != 0);
+   defaultSize = 15;
+	tokenpos = 0;
+	char *token = malloc(sizeof(char) * (defaultSize + 1));
+   memset(token, '\0', sizeof(char) * (defaultSize + 1));
 	
+	do{
+		read = bufferFill(manifestfd, buffer, sizeof(buffer));
+		for(bufferPos = 0; bufferPos < (sizeof(buffer)/sizeof(buffer[0])); ++bufferPos){
+			if(buffer[bufferPos] == '\n'){ 
+				if(manifestVersion == 0){ //This is for version of the Manifest 
+					manifestVersion = 1; 
+					if(strcmp(token, serverVersion) == 0){
+						sameVersion = 1;
+						break;
+					}
+					free(serverVersion);
+					free(token);
+		     	}else{
+		     		curLine->hash = token;
+		     		clientHead = insertMLL(curLine, clientHead);
+		     		curLine = (mNode*) malloc(sizeof(mNode) * 1);
+		     	}
+		     	defaultSize = 15;
+    			token = malloc(sizeof(char) * (defaultSize + 1));
+   			memset(token, '\0', sizeof(char) * (defaultSize + 1));
+   			tokenpos = 0;
+		     	numOfSpaces = 0;
+			}else if(buffer[bufferPos] == ' '){
+		    	numOfSpaces++;
+		    	if(numOfSpaces == 1){
+		    		curLine->version = token;
+		    	}else if(numOfSpaces == 2){
+		    		curLine->filepath = token;
+		    	}
+		    	token = malloc(sizeof(char) * (defaultSize + 1));
+   			memset(token, '\0', sizeof(char) * (defaultSize + 1));
+   			tokenpos = 0;
+			}else{
+		    	if(tokenpos >= defaultSize){
+					defaultSize = defaultSize * 2;
+					token = doubleStringSize(token, defaultSize);
+				}
+				token[tokenpos] = buffer[bufferPos];
+				tokenpos++;
+		   }
+		}
+	}while (buffer[0] != '\0' && read != 0 && sameVersion != 1);
+	defaultSize = 15;
+	tokenpos = 0;
+	if(sameVersion == 1){
+	
+	}else{
+	do{
+		if(length == 0){
+			break;
+		}else{
+			if(length > sizeof(buffer)){
+				read = bufferFill(socketfd, buffer, sizeof(buffer));
+			}else{
+				memset(buffer, '\0', sizeof(buffer));
+				read = bufferFill(socketfd, buffer, length);
+			}
+		}
+		for(bufferPos = 0; bufferPos < (sizeof(buffer)/sizeof(buffer[0])); ++bufferPos){
+			if(buffer[bufferPos] == '\n'){ 
+		     	curLine->hash = token;
+		     	serverHead = insertMLL(curLine, serverHead);
+		     	curLine = (mNode*) malloc(sizeof(mNode) * 1);
+		     	defaultSize = 15;
+    			token = malloc(sizeof(char) * (defaultSize + 1));
+   			memset(token, '\0', sizeof(char) * (defaultSize + 1));
+   			tokenpos = 0;
+		     	numOfSpaces = 0;
+			}else if(buffer[bufferPos] == ' '){
+		    	numOfSpaces++;
+		    	if(numOfSpaces == 1){
+		    		curLine->version = token;
+		    	}else if(numOfSpaces == 2){
+		    		curLine->filepath = token;
+		    	}
+		    	defaultSize = 15;
+		    	token = malloc(sizeof(char) * (defaultSize + 1));
+   			memset(token, '\0', sizeof(char) * (defaultSize + 1));
+   			tokenpos = 0;
+			}else{
+		    	if(tokenpos >= defaultSize){
+					defaultSize = defaultSize * 2;
+					token = doubleStringSize(token, defaultSize);
+				}
+				token[tokenpos] = buffer[bufferPos];
+				tokenpos++;
+		   }
+		}
+		length = length - read;
+	}while (buffer[0] != '\0' && read != 0 && length != 0);
+	}
+	printf("ServerHead:\n");
+	printMLL(serverHead);
+	printf("clientHead:\n");
+	printMLL(clientHead);
+	free(curLine); //CHANGE TO mNode FREE METHOD
 }
 
+void printMLL(mNode* head){
+	mNode* temp = head;
+	while(temp != NULL){
+		printf("Version:%s\tFilepath:%s\tHashcode:%s\n", temp->version, temp->filepath, temp->hash);
+		temp = temp->next;
+	}
+}
+
+mNode* insertMLL(mNode* newNode, mNode* head){
+	newNode->next = NULL;
+	newNode->prev = NULL;
+	if(head == NULL){
+	
+	}else{
+		newNode->next = head;
+		head->prev = newNode;
+	}
+	return newNode;
+}
 
 /*
 	Reads N bytes specified by length

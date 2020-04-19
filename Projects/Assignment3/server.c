@@ -292,6 +292,7 @@ void readNbytes(int fd, int length, char* mode, char** placeholder){
 			if(length > sizeof(buffer)){
 				read = bufferFill(fd, buffer, sizeof(buffer));
 			}else{
+				memset(buffer, '\0', sizeof(buffer));
 				read = bufferFill(fd, buffer, length);
 			}
 		}
@@ -415,7 +416,7 @@ void readManifestFiles(char* projectName, int mode, int clientfd){
 		     		if(manifestVersion == 0){ //This is for version of the Manifest 
 		     			manifestVersion = 1; 
 		     		}else{
-		     			int defaultSize = 25;
+		     			defaultSize = 25;
     					token = malloc(sizeof(char) * (defaultSize + 1));
    				 	memset(token, '\0', sizeof(char) * (defaultSize + 1));
    				 	tokenpos = 0;
