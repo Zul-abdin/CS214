@@ -52,7 +52,7 @@ void writeToFile(int fd, char* data);
 void sendFile(int clientfd, char* fileName);
 void setupFileMetadata(int clientfd, fileNode* files, int numOfFiles);
 void sendFilesToClient(int clientfd, fileNode* files, int numOfFiles);
-
+void sendManifest(char* projectName, int clientfd);
 /*
 	Helper Methods
 */
@@ -78,6 +78,7 @@ void createProject(char* directoryName, int clientfd);
 void getProjectVersion(char* directoryName, int clientfd);
 void createManifest(int fd, char* directorypath);
 void destroyProject(char* directoryName, int clientfd);
+void update(char* projectName, int clientfd);
 
 userNode* pthreadHead = NULL;
 
@@ -108,7 +109,7 @@ int main(int argc, char** argv){
 					}else{
 						printf("Successfully: Accepted Connection\n");
 						printf("Creating the thread to run this connection\n");
-						pthread_t client = (pthread_t) NULL;
+						pthread_t client = NULL;
 						pthread_create(&client, NULL, metadataParser, &clientfd);
 						insertThreadLL(client);
 					}
@@ -153,8 +154,16 @@ void* metadataParser(void* clientfdptr){
 			if(mode == NULL){
 				mode = token;
 				printf("%s\n", mode);
+			}else if(strcmp(mode, "update") == 0){
+				printf("Getting the project to update\n");
+				fileLength = atoi(token);
+				free(token);
+				char* temp = NULL;
+				readNbytes(clientfd, fileLength, NULL, &temp);
+				update(temp, clientfd);
+				free(temp);
 			}else if(strcmp(mode, "destroy") == 0){
-				printf("Reading the project to destroy\n");
+				printf("Getting the project to destroy\n");
 				fileLength = atoi(token);
 				free(token);
 				char* temp = NULL;
@@ -162,7 +171,7 @@ void* metadataParser(void* clientfdptr){
 				destroyProject(temp, clientfd);
 				free(temp);
 			}else if(strcmp(mode, "checkout") == 0){
-				printf("Reading the project to check out\n");
+				printf("Getting the project to check out\n");
 				fileLength = atoi(token);
 				free(token);
 				char* temp = NULL;
@@ -172,7 +181,7 @@ void* metadataParser(void* clientfdptr){
 				sendFilesToClient(clientfd, listOfFiles, numOfFiles);
 				free(temp);
 			}else if(strcmp(mode, "create") == 0) {
-				printf("Reading the filename to create\n");
+				printf("Getting the filename to create\n");
 				fileLength = atoi(token);
 				free(token);
 				char* temp = NULL;
@@ -311,11 +320,10 @@ void createProject(char* directoryName, int clientfd){
 		int fd = open(manifest, O_WRONLY | O_TRUNC | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
 		createManifest(fd, directoryName);
 		close(fd);
+		free(manifest);
 		printf("Sending the Manifest to Client\n");
 		writeToFile(clientfd, "SUCCESS");
-		fileNode* manifestNode = createFileNode(manifest, strdup("Manifest"));
-		sendFilesToClient(clientfd, manifestNode, 1);
-		listOfFiles = manifestNode;
+		sendManifest(directoryName, clientfd);
 	}else{
 		printf("Directory Failed to Create: Sending Error to Client\n");
 		writeToFile(clientfd, "FAILURE");
@@ -334,10 +342,31 @@ void destroyProject(char* directoryName, int clientfd){
 	}
 }
 
+void update(char* projectName, int clientfd){
+	char* manifest = generateManifestPath(projectName);
+	int fd = open(manifest, O_RDONLY);
+	free(manifest);
+	if(fd == -1){
+		printf("Project's Manifest does not exist or could not open, sending error to client\n");
+		writeToFile(clientfd, "FAILURE");
+	}else{
+		printf("Project's Manifest found, sending to client\n");
+		writeToFile(clientfd, "SUCCESS");
+		sendManifest(projectName, clientfd);
+	}
+}
+
 void createManifest(int fd, char* directorypath){
 	writeToFile(fd, "1");
 	writeToFile(fd, "\n");
 	directoryTraverse(directorypath, 0, fd);
+}
+
+void sendManifest(char* projectName, int clientfd){
+	char* manifest = generateManifestPath(projectName);
+	fileNode* manifestNode = createFileNode(manifest, strdup("Manifest"));
+	insertLL(manifestNode);
+	sendFilesToClient(clientfd, manifestNode, 1);
 }
 
 char* generateManifestPath(char* projectName){
@@ -358,7 +387,7 @@ void readManifestFiles(char* projectName, int mode, int clientfd){
 	numOfFiles = 0;
 	int manifestfd = open(manifest, O_RDONLY);
 	if(manifestfd == -1){
-		printf("Error: Server does not contain the project or the Manifest is missing, sending error to client\n");
+		printf("Error: Server does not contain the project or the Manifest is missing or no permissions, sending error to client\n");
 		writeToFile(clientfd, "FAILURE");
 	}else{
 		writeToFile(clientfd, "SUCCESS");

@@ -102,8 +102,25 @@ int main(int argc, char** argv) {
     			}else{
     			
     			}
-    		}else if(strlen(argv[1]) == 6 && strcmp(argv[1], "update") == 0){ //update
+    		}else if(strlen(argv[1]) == 6 && strcmp(argv[1], "update") == 0){ //UPDATE
+    			int socketfd = setupConnection();
+    			if(socketfd > 0){
+    				writeToFile(socketfd, "update$");
+    				sendLength(socketfd, argv[2]);
+    				char* temp = NULL;
+    				readNbytes(socketfd, strlen("FAILURE"), NULL, &temp);
+    				if(strcmp(temp, "SUCCESS") == 0){
+    					printf("Server sucessfully located the project's manifest, recieving the server manifest\n");
+    					
+    				}else if(strcmp(temp , "FAILURE") == 0){
+    					printf("Error: Server failed to locate the project's manifest\n");
+    				}else{
+    					printf("Error: Could not interpret the server's response\n");
+    				}
+    				close(socketfd);
+    			}else{
     			
+    			}
     		}else if(strlen(argv[1]) == 7 && strcmp(argv[1], "upgrade") == 0){ //upgrade
     			
     		}else if(strlen(argv[1]) == 6 && strcmp(argv[1], "commit") == 0){ //commit
@@ -349,6 +366,18 @@ void createProject(char* directoryName, int socketfd){
 		printf("Client: Directory Failed to Create\n");
 	}
 }
+
+void update(char* ProjectName, int socketfd){
+	char* manifest = generateManifestPath(ProjectName);
+	int manifestfd = open(manifest, O_RDONLY);
+	if(manifestfd == -1){
+		printf("Fatal Error: Manifest does not exist or does not have permissions to be opened\n");
+		return;
+	}
+	/*Implement Manifest checking*/
+	
+}
+
 
 /*
 	Reads N bytes specified by length
