@@ -54,7 +54,7 @@ void insertLL(fileNode* node);
 void appendToManifest(char* ProjectName, char* token);
 char* createManifestLine(char* version, char* filepath, char* hashcode, int local, int mode);
 char* generateManifestPath(char* projectName);
-void removeFromManifest(char* ProjectName, char* filepath);
+void modifyManifest(char* projectName, char* filepath, int mode, char* replace);
 char* generateHashCode(char* filepath);
 mNode* insertMLL(mNode* newNode, mNode* head);
 void printMLL(mNode* head);
@@ -62,6 +62,10 @@ void quickSortRecursive(mNode* startNode, mNode* endNode, int (*comparator)(void
 int quickSort( mNode* head, int (*comparator)(void*, void*));
 void* partition(mNode* startNode, mNode* endNode, int (*comparator)(void*, void*));
 int strcomp(void* string1, void* string2); //Use as comparator
+char* generatePath(char* projectName, char* pathToAppend);
+int searchMLL(mNode* serverManifest, mNode* clientManifest, int updateFilefd);
+void compareManifest(mNode* serverManifest, mNode* clientManifest, char* ProjectName);
+int checkVersionAndHash(mNode* serverNode, mNode* clientNode, char* projectName, int updateFilefd, int conflictFilefd);
 /*
 	File Sending Methods
 */
@@ -228,23 +232,26 @@ int main(int argc, char** argv) {
     			if(directoryExist(argv[2]) == 0){
     				printf("Fatal Error: Project does not exist to add the file\n");
     			}else{
-    				char* hashcode = generateHashCode(argv[3]);
+    				char* path = generatePath("", argv[3]);
+    				printf("%s\n", path);
+    				char* hashcode = generateHashCode(path);
     				if(hashcode == NULL){
     					
     				}else{
 		 				char* temp = createManifestLine("1", argv[3], hashcode, 1, 1); 
-		 				appendToManifest(argv[2], temp);
+		 				modifyManifest(argv[2], argv[3], 1, temp);    
+		 				//appendToManifest(argv[2], temp);
 		 				free(hashcode);
 		 				free(temp);
     				}
-    				
+    				free(path);
     			}
     			
     		}else if(strlen(argv[1]) == 6 && strcmp(argv[1], "remove") == 0){ //Remove
     			if(directoryExist(argv[2]) == 0){
     				printf("Fatal Error: Project does not exist to remove the file\n");
     			}else{
-    				removeFromManifest(argv[2], argv[3]);
+    				modifyManifest(argv[2], argv[3], 0, NULL);
     			}
     		}else if(strlen(argv[1]) == 8 && strcmp(argv[1], "rollback") == 0){ //Rollback
     		
@@ -387,6 +394,7 @@ void createProject(char* directoryName, int socketfd){
 void update(char* ProjectName, int socketfd){
 	char* manifest = generateManifestPath(ProjectName);
 	int manifestfd = open(manifest, O_RDONLY);
+	free(manifest);
 	if(manifestfd == -1){
 		printf("Fatal Error: Manifest does not exist or does not have permissions to be opened\n");
 		return;
@@ -474,59 +482,215 @@ void update(char* ProjectName, int socketfd){
 	defaultSize = 15;
 	tokenpos = 0;
 	if(sameVersion == 1){
-	
+		char* updateFile = generatePath(ProjectName, "/Update"); //CHANGE TO ./Update for FINAL
+		char* conflictFile =  generatePath(ProjectName, "/Conflict"); //CHANGE TO ./Conflict for FINAL
+		int updateFilefd = open(updateFile, O_RDONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+		close(updateFilefd);
+		remove(conflictFile);
+		free(updateFile);
+		free(conflictFile);
+		printf("Up To Date\n");
+		return;
 	}else{
-	do{
-		if(length == 0){
-			break;
-		}else{
-			if(length > sizeof(buffer)){
-				read = bufferFill(socketfd, buffer, sizeof(buffer));
+		do{
+			if(length == 0){
+				break;
 			}else{
-				memset(buffer, '\0', sizeof(buffer));
-				read = bufferFill(socketfd, buffer, length);
-			}
-		}
-		for(bufferPos = 0; bufferPos < (sizeof(buffer)/sizeof(buffer[0])); ++bufferPos){
-			if(buffer[bufferPos] == '\n'){ 
-		     	curLine->hash = token;
-		     	serverHead = insertMLL(curLine, serverHead);
-		     	curLine = (mNode*) malloc(sizeof(mNode) * 1);
-		     	defaultSize = 15;
-    			token = malloc(sizeof(char) * (defaultSize + 1));
-   			memset(token, '\0', sizeof(char) * (defaultSize + 1));
-   			tokenpos = 0;
-		     	numOfSpaces = 0;
-			}else if(buffer[bufferPos] == ' '){
-		    	numOfSpaces++;
-		    	if(numOfSpaces == 1){
-		    		curLine->version = token;
-		    	}else if(numOfSpaces == 2){
-		    		curLine->filepath = token;
-		    	}
-		    	defaultSize = 15;
-		    	token = malloc(sizeof(char) * (defaultSize + 1));
-   			memset(token, '\0', sizeof(char) * (defaultSize + 1));
-   			tokenpos = 0;
-			}else{
-		    	if(tokenpos >= defaultSize){
-					defaultSize = defaultSize * 2;
-					token = doubleStringSize(token, defaultSize);
+				if(length > sizeof(buffer)){
+					read = bufferFill(socketfd, buffer, sizeof(buffer));
+				}else{
+					memset(buffer, '\0', sizeof(buffer));
+					read = bufferFill(socketfd, buffer, length);
 				}
-				token[tokenpos] = buffer[bufferPos];
-				tokenpos++;
-		   }
-		}
-		length = length - read;
-	}while (buffer[0] != '\0' && read != 0 && length != 0);
+			}
+			for(bufferPos = 0; bufferPos < (sizeof(buffer)/sizeof(buffer[0])); ++bufferPos){
+				if(buffer[bufferPos] == '\n'){ 
+				  	curLine->hash = token;
+				  	serverHead = insertMLL(curLine, serverHead);
+				  	curLine = (mNode*) malloc(sizeof(mNode) * 1);
+				  	defaultSize = 15;
+		 			token = malloc(sizeof(char) * (defaultSize + 1));
+					memset(token, '\0', sizeof(char) * (defaultSize + 1));
+					tokenpos = 0;
+				  	numOfSpaces = 0;
+				}else if(buffer[bufferPos] == ' '){
+				 	numOfSpaces++;
+				 	if(numOfSpaces == 1){
+				 		curLine->version = token;
+				 	}else if(numOfSpaces == 2){
+				 		curLine->filepath = token;
+				 	}
+				 	defaultSize = 15;
+				 	token = malloc(sizeof(char) * (defaultSize + 1));
+					memset(token, '\0', sizeof(char) * (defaultSize + 1));
+					tokenpos = 0;
+				}else{
+				 	if(tokenpos >= defaultSize){
+						defaultSize = defaultSize * 2;
+						token = doubleStringSize(token, defaultSize);
+					}
+					token[tokenpos] = buffer[bufferPos];
+					tokenpos++;
+				}
+			}
+			length = length - read;
+		}while (buffer[0] != '\0' && read != 0 && length != 0);
 	}
-	quickSort(serverHead, strcomp);
-	quickSort(clientHead, strcomp);
+	if(serverHead != NULL){
+		quickSort(serverHead, strcomp);
+	}
+	if(clientHead != NULL){
+		quickSort(clientHead, strcomp);
+	}
 	printf("ServerHead:\n");
 	printMLL(serverHead);
 	printf("clientHead:\n");
 	printMLL(clientHead);
 	free(curLine); //CHANGE TO mNode FREE METHOD
+	compareManifest(serverHead, clientHead, ProjectName);
+}
+
+void compareManifest(mNode* serverManifest, mNode* clientManifest, char* ProjectName){
+	char* updateFile = generatePath(ProjectName, "/Update"); //CHANGE TO ./Update for FINAL
+	char* conflictFile =  generatePath(ProjectName, "/Conflict"); //CHANGE TO ./Conflict for FINAL
+	printf("Updatepath: %s\n", updateFile);
+	printf("Conflictpath: %s\n", conflictFile);
+	mNode* serverCurNode = serverManifest;
+	mNode* clientCurNode = clientManifest;
+	int updateFilefd = open(updateFile, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+	if(serverCurNode == NULL && clientCurNode == NULL){
+		printf("Warning: There were no entries in either Server's Manifest or Client's Manifest\n");
+		return;
+	}
+	int conflictFilefd = open(conflictFile, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+	int conflict = 0;
+	while(serverCurNode != NULL && clientCurNode != NULL){
+		if(strcmp(serverCurNode->filepath, clientCurNode->filepath) == 0){
+			int success = checkVersionAndHash(serverCurNode, clientCurNode, ProjectName, updateFilefd, conflictFilefd);
+			if(success == -1){
+				printf("Error: File did not exist or had no permissions to compute livehash, continuing to update regardless\n");
+			}else if(success == 2){
+				conflict = 1;
+			}
+			serverCurNode = serverCurNode->next;
+			clientCurNode = clientCurNode->next;
+		}else{
+			int success = searchMLL(serverCurNode, clientCurNode, updateFilefd);
+			if(success){
+				serverCurNode = serverCurNode->next;
+			}else{
+				clientCurNode = clientCurNode->next;
+			}
+		}
+	}
+	
+	if(serverCurNode != NULL){
+		while(serverCurNode != NULL){
+			printf("A %s\n",serverCurNode->filepath);
+			writeToFile(updateFilefd, "A ");
+			writeToFile(updateFilefd, serverCurNode->filepath);
+			writeToFile(updateFilefd, " ");
+			writeToFile(updateFilefd, serverCurNode->hash);
+			writeToFile(updateFilefd, "\n");
+			serverCurNode = serverCurNode->next;
+		}
+	}else{
+		while(clientCurNode != NULL){
+			printf("D %s\n", clientCurNode->filepath);
+			writeToFile(updateFilefd, "D ");
+			writeToFile(updateFilefd, clientCurNode->filepath);
+			writeToFile(updateFilefd, " ");
+			writeToFile(updateFilefd, clientCurNode->hash);
+			writeToFile(updateFilefd, "\n");
+			clientCurNode = clientCurNode->next;
+		}
+	}
+	close(conflictFilefd);
+	close(updateFilefd);
+	if(conflict == 0){
+		remove(conflictFile);
+	}
+	free(conflictFile);
+	free(updateFile);
+}
+
+int searchMLL(mNode* serverManifest, mNode* clientManifest, int updatefd){
+	mNode* serverCurNode = serverManifest;
+	mNode* clientCurNode = clientManifest;
+	if(strcmp(serverCurNode->filepath, clientCurNode->filepath) > 0){
+		printf("D %s\n", clientCurNode->filepath);
+		writeToFile(updatefd, "D ");
+		writeToFile(updatefd, clientCurNode->filepath);
+		writeToFile(updatefd, " ");
+		writeToFile(updatefd, clientCurNode->hash);
+		writeToFile(updatefd, "\n");
+		return 0;
+	}else{
+		printf("A %s\n",serverCurNode->filepath);
+		writeToFile(updatefd, "A ");
+		writeToFile(updatefd, serverCurNode->filepath);
+		writeToFile(updatefd, " ");
+		writeToFile(updatefd, serverCurNode->hash);
+		writeToFile(updatefd, "\n");
+		return 1;
+	}
+}
+/*
+	Returns:
+		-1 -> File did not exist to compute the livehash
+		0 -> both are the same 
+		1 -> Outputted Modified
+		2 -> Outputted Conflict
+		
+*/
+int checkVersionAndHash(mNode* serverNode, mNode* clientNode, char* projectName, int updateFilefd, int conflictFilefd){
+	mNode* serverCurNode = serverNode;
+	mNode* clientCurNode = clientNode;
+	if(strcmp(serverCurNode->version, clientCurNode->version) == 0 && strcmp(serverCurNode->hash, clientCurNode->hash) == 0){
+		serverCurNode = serverCurNode->next;
+		clientCurNode = clientCurNode->next;
+		return 0;
+	}else{
+		char* temp = generatePath("", clientCurNode->filepath);
+		char* livehash = generateHashCode(temp);
+		if(livehash == NULL){
+			free(temp);
+			return -1;
+		}
+		if(strcmp(livehash, clientCurNode->hash) != 0){
+			if(strcmp(livehash,serverCurNode->hash) != 0){
+				printf("C %s\n", clientCurNode->filepath);
+				writeToFile(conflictFilefd, "C ");
+				writeToFile(conflictFilefd, serverCurNode->filepath);
+				writeToFile(conflictFilefd, " ");
+				writeToFile(conflictFilefd, livehash);
+				writeToFile(conflictFilefd, "\n");
+				free(temp);
+				free(livehash);
+				return 2;
+			}//What if it is equal to server hash, what to do?
+		}else{
+			printf("M %s\n", serverCurNode->filepath);
+			writeToFile(updateFilefd, "M ");
+			writeToFile(updateFilefd, serverCurNode->filepath);
+			writeToFile(updateFilefd, " ");
+			writeToFile(updateFilefd, serverCurNode->hash);
+			writeToFile(updateFilefd, "\n");
+			free(temp);
+			free(livehash);
+			return 1;
+		}
+	}
+}
+
+char* generatePath(char* projectName, char* pathToAppend){
+	char* filepath = malloc(sizeof(char) * (strlen(projectName) + strlen(pathToAppend) + 3));
+	memset(filepath, '\0', (sizeof(char) * (strlen(projectName) + 3 + strlen(pathToAppend))));
+	filepath[0] = '.';
+	filepath[1] = '/';
+	memcpy(filepath + 2, projectName, strlen(projectName));
+	strcat(filepath, pathToAppend);
+	return filepath;
 }
 
 void printMLL(mNode* head){
@@ -683,8 +847,11 @@ void writeToFile(int fd, char* data){
 		bytesWritten += status;
 	}
 }
-
-void removeFromManifest(char* projectName, char* filepath){
+/*
+	Mode 0: Remove
+	Mode 1: Add
+*/
+void modifyManifest(char* projectName, char* filepath, int mode, char* replace){
 	char* manifest = generateManifestPath(projectName);
 	char* manifestTemp = malloc(sizeof(char) * (strlen(manifest) + 5));
 	memset(manifestTemp, '\0', sizeof(char) * (strlen(manifest) + 5));
@@ -743,8 +910,12 @@ void removeFromManifest(char* projectName, char* filepath){
 				}
 				printf("%s\n", temp);
 				free(temp);
-				if(found != 0){
-					writeToFile(tempmanifestfd, token);
+				if(found == 0 && mode == 1){
+					writeToFile(tempmanifestfd, replace);
+				}else{
+					if(found != 0){
+						writeToFile(tempmanifestfd, token);
+					}	
 				}
 				found = -1;
 				free(token);
@@ -757,11 +928,19 @@ void removeFromManifest(char* projectName, char* filepath){
 	}while(buffer[0] != '\0' && read != 0);
 	
 	close(manifestfd);
-	close(tempmanifestfd);
+
 	if(existed == -1){
-		printf("Warning: The file is not listed in the Manifest\n");
-		int success = remove(manifestTemp);
-		printf("%d\n", success);
+		if(mode == 1){
+			writeToFile(tempmanifestfd, replace);
+			close(tempmanifestfd);
+			remove(manifest);
+			rename(manifestTemp, manifest);
+		}else{
+			printf("Warning: The file is not listed in the Manifest\n");
+			close(tempmanifestfd);
+			int success = remove(manifestTemp);
+			printf("%d\n", success);
+		}
 	}else{
 		remove(manifest);
 		rename(manifestTemp, manifest);

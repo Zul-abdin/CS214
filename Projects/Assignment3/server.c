@@ -154,6 +154,9 @@ void* metadataParser(void* clientfdptr){
 			if(mode == NULL){
 				mode = token;
 				printf("%s\n", mode);
+			}else if(strcmp(mode, "upgrade") == 0){
+				
+			
 			}else if(strcmp(mode, "update") == 0){
 				printf("Getting the project to update\n");
 				fileLength = atoi(token);
@@ -193,7 +196,7 @@ void* metadataParser(void* clientfdptr){
 				free(temp);
 				break;
          }else if(strcmp(mode, "currentversion") == 0){
-             printf("Reading the filename\n");
+             printf("Getting the Project\n");
              fileLength = atoi(token);
              free(token);
              char* temp = NULL;
@@ -460,7 +463,9 @@ void readManifestFiles(char* projectName, int mode, int clientfd){
 */
 void getProjectVersion(char* directoryName, int clientfd) {
     printf("Attempting to get project Version\n");
-    int fdManifest = open(strcat(directoryName, "/Manifest"), O_RDONLY);
+    char* manifest = generateManifestPath(directoryName);
+    int fdManifest = open(manifest, O_RDONLY);
+    free(manifest);
     if(fdManifest == -1){
     	printf("Error: Project's Manifest Requested does not exist or does not have permissions to access on the server side, sending error to client\n");
     	writeToFile(clientfd, "FAILURE");
