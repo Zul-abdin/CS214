@@ -162,6 +162,7 @@ void* metadataParser(void* clientfdptr){
 				readNbytes(clientfd, fileLength, NULL, &temp);
 				update(temp, clientfd);
 				free(temp);
+				break;
 			}else if(strcmp(mode, "destroy") == 0){
 				printf("Getting the project to destroy\n");
 				fileLength = atoi(token);
@@ -170,6 +171,7 @@ void* metadataParser(void* clientfdptr){
 				readNbytes(clientfd, fileLength, NULL, &temp);
 				destroyProject(temp, clientfd);
 				free(temp);
+				break;
 			}else if(strcmp(mode, "checkout") == 0){
 				printf("Getting the project to check out\n");
 				fileLength = atoi(token);
@@ -180,6 +182,7 @@ void* metadataParser(void* clientfdptr){
 				printFiles();
 				sendFilesToClient(clientfd, listOfFiles, numOfFiles);
 				free(temp);
+				break;
 			}else if(strcmp(mode, "create") == 0) {
 				printf("Getting the filename to create\n");
 				fileLength = atoi(token);
@@ -256,9 +259,6 @@ void* metadataParser(void* clientfdptr){
 	}while(buffer[0] != '\0' && read != 0);
 	if(mode != NULL){
 		free(mode);
-	}
-	if(token != NULL){
-		free(token);
 	}
 	freeFileNodes();
 	numOfFiles = 0;
