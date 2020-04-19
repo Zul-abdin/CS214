@@ -58,6 +58,10 @@ void removeFromManifest(char* ProjectName, char* filepath);
 char* generateHashCode(char* filepath);
 mNode* insertMLL(mNode* newNode, mNode* head);
 void printMLL(mNode* head);
+void quickSortRecursive(mNode* startNode, mNode* endNode, int (*comparator)(void*, void*));
+int quickSort( mNode* head, int (*comparator)(void*, void*));
+void* partition(mNode* startNode, mNode* endNode, int (*comparator)(void*, void*));
+int strcomp(void* string1, void* string2); //Use as comparator
 /*
 	File Sending Methods
 */
@@ -516,6 +520,8 @@ void update(char* ProjectName, int socketfd){
 		length = length - read;
 	}while (buffer[0] != '\0' && read != 0 && length != 0);
 	}
+	quickSort(serverHead, strcomp);
+	quickSort(clientHead, strcomp);
 	printf("ServerHead:\n");
 	printMLL(serverHead);
 	printf("clientHead:\n");
@@ -1055,4 +1061,77 @@ char* doubleStringSize(char* word, int newsize){
 	memcpy(expanded, word, strlen(word));
 	free(word);
 	return expanded;
+}
+
+void quickSortRecursive(mNode* startNode, mNode* endNode, int (*comparator)(void*, void*)){
+    if(startNode == endNode || startNode == NULL || endNode == NULL){
+        return;
+    }
+
+    mNode* prevPivot = partition(startNode, endNode, comparator);
+    if(prevPivot != startNode){
+        quickSortRecursive(startNode, prevPivot->prev, comparator);
+    }
+    if(prevPivot != endNode){
+        quickSortRecursive(prevPivot->next, endNode, comparator);
+    }
+
+}
+
+int quickSort( mNode* head, int (*comparator)(void*, void*)){
+    mNode* tail = head;
+    while(tail->next != NULL){
+        tail = tail->next;
+    }
+    quickSortRecursive(head, tail, comparator);
+    return 1;
+}
+
+void* partition(mNode* startNode, mNode* endNode, int (*comparator)(void*, void*)){
+    mNode* pivot = startNode;
+
+    mNode* left = pivot->next;
+    mNode* end = endNode;
+    mNode* storeIndex = left;
+    mNode* beforeNULL = end;
+
+
+    mNode* i;
+    for(i = left; i != end->next; i = i->next){
+        if(comparator(i, pivot) <= 0){
+            beforeNULL = storeIndex;
+            char* holder = i->filepath;
+            i->filepath = storeIndex->filepath;
+            storeIndex->filepath = holder;
+            storeIndex = storeIndex->next;
+        }
+    }
+    char* holder = pivot->filepath;
+    if(storeIndex == NULL){
+        pivot->filepath = beforeNULL->filepath;
+        beforeNULL->filepath = holder;
+        return beforeNULL;
+    }else{
+        pivot->filepath = storeIndex->prev->filepath;
+        storeIndex->prev->filepath = holder;
+        return storeIndex->prev;
+    }
+    return NULL; //ERROR IF IT REACHES HERE
+}
+
+int strcomp(void* string1, void* string2){
+    mNode* s1ptr = (mNode*) string1;
+    mNode* s2ptr = (mNode*) string2;
+
+    char* s1 = s1ptr->filepath;
+    char* s2 = s2ptr->filepath;
+    while(*s1 != '\0' && *s2 != '\0'){
+        if(*s1 == *s2){
+            s1 = s1 + sizeof(char);
+            s2 = s2 + sizeof(char);
+        }else{
+            return *s1 - *s2;
+        }
+    }
+    return *s1 - *s2;
 }
