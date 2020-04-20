@@ -71,6 +71,9 @@ void printFiles();
 void insertLL(fileNode* node);
 char* generateHashCode(char* filepath);
 void insertThreadLL(pthread_t node);
+void sendLength(int socketfd, char* token);
+void getManifestVersion(char* projectName, int clientfd);
+
 /*
 	Command Methods
 */
@@ -79,12 +82,15 @@ void getProjectVersion(char* directoryName, int clientfd);
 void createManifest(int fd, char* directorypath);
 void destroyProject(char* directoryName, int clientfd);
 void update(char* projectName, int clientfd);
+void upgrade(char* projectName, int clientfd);
 
 userNode* pthreadHead = NULL;
 
 fileNode* listOfFiles = NULL;
 int numOfFiles = 0;
 
+pthread_mutex_t lockRepo;
+pthread_mutex_t pthreadLock;
 int main(int argc, char** argv){
 	signal(SIGINT, sighandler);
 	atexit(unloadMemory);
@@ -102,6 +108,8 @@ int main(int argc, char** argv){
 			}else{
 				struct sockaddr_in client;
 				socklen_t clientSize = sizeof(struct sockaddr_in);
+				pthread_mutex_init(&pthreadLock, NULL);
+				pthread_mutex_init(&lockRepo, NULL);
 				while(1){
 					int clientfd = accept(socketfd, (struct sockaddr*) &client, &clientSize);
 					if(clientfd == -1){
@@ -124,13 +132,14 @@ void insertThreadLL(pthread_t node){
 	userNode* newNode = malloc(sizeof(userNode) * 1);
 	newNode->thread = node;
 	newNode->next = NULL;
-	
+	pthread_mutex_lock(&pthreadLock);
 	if(pthreadHead == NULL){
 		pthreadHead = newNode;
 	}else{
 		newNode->next = pthreadHead;
 		pthreadHead = newNode;
 	}
+	pthread_mutex_unlock(&pthreadLock);
 }
 
 void* metadataParser(void* clientfdptr){
@@ -154,9 +163,30 @@ void* metadataParser(void* clientfdptr){
 			if(mode == NULL){
 				mode = token;
 				printf("%s\n", mode);
+				pthread_mutex_lock(&lockRepo);
+			}else if(strcmp(mode, "getManifestVersion") == 0){
+				printf("Getting the project name to retrieve the manifest version\n");
+				fileLength = atoi(token);
+				free(token);
+				char* temp = NULL;
+				readNbytes(clientfd, fileLength, NULL, &temp);
+				getManifestVersion(temp, clientfd);
+				free(temp);
 			}else if(strcmp(mode, "upgrade") == 0){
-				
-			
+				fileLength = atoi(token);
+				free(token);
+				if(fileLength == 0){
+					printf("Entered\n");
+					writeToFile(clientfd, "SUCCESS");
+					printf("Done");
+				}else{ 
+					printf("Getting the project's files to update\n");
+					char* temp = NULL;
+					readNbytes(clientfd, fileLength, NULL, &temp);
+					upgrade(temp, clientfd);
+					free(temp);
+				}
+				break;
 			}else if(strcmp(mode, "update") == 0){
 				printf("Getting the project to update\n");
 				fileLength = atoi(token);
@@ -239,6 +269,7 @@ void* metadataParser(void* clientfdptr){
 					fileName = 0;
 				}
 				if(numOfFiles == filesRead){
+					free(file);
 					fileNode* temp = listOfFiles;
 					while(temp != NULL){
 						printf("File: %s\n", temp->filename);
@@ -265,6 +296,7 @@ void* metadataParser(void* clientfdptr){
 	}
 	freeFileNodes();
 	numOfFiles = 0;
+	pthread_mutex_unlock(&lockRepo);
 	pthread_exit(NULL);
 }
 void printFiles(){
@@ -316,18 +348,19 @@ void readNbytes(int fd, int length, char* mode, char** placeholder){
 	}
 }
 
-void createProject(char* directoryName, int clientfd){
+void createProject(char* projectName, int clientfd){
 	printf("Attempting to create the directory\n");
-	int success = makeDirectory(directoryName);
+	int success = makeDirectory(projectName);
 	if(success){
-		char* manifest = generateManifestPath(directoryName);
+		char* manifest = generateManifestPath(projectName);
 		int fd = open(manifest, O_WRONLY | O_TRUNC | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
-		createManifest(fd, directoryName);
+		createManifest(fd, projectName);
 		close(fd);
 		free(manifest);
 		printf("Sending the Manifest to Client\n");
 		writeToFile(clientfd, "SUCCESS");
-		sendManifest(directoryName, clientfd);
+		printf("projectName: %s\n", projectName);
+		sendManifest(projectName, clientfd);
 	}else{
 		printf("Directory Failed to Create: Sending Error to Client\n");
 		writeToFile(clientfd, "FAILURE");
@@ -360,6 +393,64 @@ void update(char* projectName, int clientfd){
 	}
 }
 
+void upgrade(char* projectName, int clientfd){
+	char buffer[2] = {'\0'}; 
+	int defaultSize = 15;
+	char* token = malloc(sizeof(char) * (defaultSize + 1));
+	memset(token, '\0', sizeof(char) * (defaultSize + 1));
+	int read = 0;
+	int bufferPos = 0;
+	int tokenpos = 0;
+	int fileLength = 0;
+	int filesRead = 0;
+	listOfFiles = NULL;
+	do{ 
+		read = bufferFill(clientfd, buffer, 1);
+		if(buffer[0] == '$'){
+			if(numOfFiles == 0){
+				numOfFiles = atoi(token);
+				free(token);
+			}else{
+				char* temp = NULL;
+				fileLength = atoi(token);
+				free(token);
+				readNbytes(clientfd, fileLength, NULL, &temp);
+				
+				char* name = (char*) malloc(sizeof(char) * strlen(basename(temp)) + 1);
+				memset(name, '\0', sizeof(char) * strlen(basename(temp)) + 1);
+				memcpy(name, basename(temp), strlen(basename(temp)));
+
+				fileNode* file = createFileNode(temp, name);
+				insertLL(file);
+				
+				filesRead++;
+			}
+			if(numOfFiles == filesRead){
+				fileNode* temp = listOfFiles;
+				while(temp != NULL){
+					printf("File: %s\n", temp->filename);
+					temp = temp->next;
+				}
+				break;
+			}
+			defaultSize = 10;
+			tokenpos = 0;
+			token = (char*) malloc(sizeof(char) * (defaultSize + 1));
+			memset(token, '\0', sizeof(char) * (defaultSize + 1));
+		}else{
+			if(tokenpos >= defaultSize){
+				defaultSize = defaultSize * 2;
+				token = doubleStringSize(token, defaultSize);
+			}
+			token[tokenpos] = buffer[0];
+			tokenpos++;
+		}
+	}while(read != 0 && buffer[0] != '\0');
+	sendFilesToClient(clientfd, listOfFiles, numOfFiles);
+	
+	getManifestVersion(projectName, clientfd);
+}
+
 void createManifest(int fd, char* directorypath){
 	writeToFile(fd, "1");
 	writeToFile(fd, "\n");
@@ -381,6 +472,51 @@ char* generateManifestPath(char* projectName){
 	memcpy(manifest + 2, projectName, strlen(projectName));
 	strcat(manifest, "/Manifest");
 	return manifest;
+}
+
+void getManifestVersion(char* projectName, int clientfd){
+	char* manifest = generateManifestPath(projectName);
+	int manifestfd = open(manifest, O_RDONLY);
+	if(manifestfd == -1){
+		printf("Error: Server does not contain the project or the Manifest is missing or no permissions, sending error to client\n");
+		writeToFile(clientfd, "FAILURE");
+	}else{
+		writeToFile(clientfd, "SUCCESS");
+		char buffer[100] = {'\0'};
+    	int defaultSize = 25;
+    	char *token = malloc(sizeof(char) * (defaultSize + 1));
+    	memset(token, '\0', sizeof(char) * (defaultSize + 1));
+    	int tokenpos = 0;
+    	int bufferPos = 0;
+    	int read = 0;
+    	do{
+    		read = bufferFill(manifestfd, buffer, sizeof(buffer));
+    		for(bufferPos = 0; bufferPos < sizeof(buffer); ++bufferPos){
+    			if(tokenpos >= defaultSize){
+					defaultSize = defaultSize * 2;
+					token = doubleStringSize(token, defaultSize);
+				}
+				token[tokenpos] = buffer[bufferPos];
+				tokenpos++;
+				if(buffer[bufferPos] == '\n'){
+					sendLength(clientfd, token);
+					read = 0;
+					break;
+				}
+    		}
+    	}while(read != 0 && buffer[0] != '\0');
+    	free(token);
+		close(manifestfd);
+	}	
+	free(manifest);
+}
+
+void sendLength(int socketfd, char* token){
+	char str[5] = {'\0'};
+	sprintf(str, "%lu", strlen(token));
+	writeToFile(socketfd, str);
+	writeToFile(socketfd, "$");
+	writeToFile(socketfd, token);
 }
 
 /*
@@ -693,6 +829,7 @@ char* generateHashCode(char* filepath){
 			previous += 2;
 		}
 		free(hash);
+		close(filefd);
 		return hexhash;
 	}
 }

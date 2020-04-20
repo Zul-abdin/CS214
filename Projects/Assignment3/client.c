@@ -66,6 +66,8 @@ char* generatePath(char* projectName, char* pathToAppend);
 int searchMLL(mNode* serverManifest, mNode* clientManifest, int updateFilefd);
 void compareManifest(mNode* serverManifest, mNode* clientManifest, char* ProjectName);
 int checkVersionAndHash(mNode* serverNode, mNode* clientNode, char* projectName, int updateFilefd, int conflictFilefd);
+void updateManifestVersion(char* projectName, int socketfd);
+void printFiles();
 /*
 	File Sending Methods
 */
@@ -85,6 +87,8 @@ int bufferFill(int fd, char* buffer, int bytesToRead);
 */
 void createProject(char* directoryName, int socketfd);
 void update(char* ProjectName, int socketfd);
+void upgradeProcess(char* projectName, int upgradefd, int socketfd);
+
 
 fileNode* listOfFiles = NULL;
 int numOfFiles = 0;
@@ -141,7 +145,33 @@ int main(int argc, char** argv) {
     			
     			}
     		}else if(strlen(argv[1]) == 7 && strcmp(argv[1], "upgrade") == 0){ //upgrade
-    			
+    			char* conflictFile = generatePath(argv[2], "/Conflict"); //Check later
+
+    			int conflictFd = open(conflictFile, O_RDONLY);
+    			if(conflictFd != -1){
+    				printf("Fatal Error: Please resolve Conflicts before upgrade\n");
+    				close(conflictFd);
+    				free(conflictFile);
+    			}else{
+    				free(conflictFile);
+    				char* updateFile = generatePath(argv[2], "/Update");
+    				int updateFd = open(updateFile, O_RDONLY);
+    				if(updateFd == -1){
+    					printf("Fatal Error: Please call upgrade before update\n");
+    					free(updateFile);
+    					freeFileNodes();
+    					return 0;
+    				}
+    				int socketfd = setupConnection();
+    				if(socketfd > 0){
+    					upgradeProcess(argv[2], updateFd, socketfd);
+    				}else{
+    				
+    				}
+    				close(updateFd);
+    				remove(updateFile);
+    				free(updateFile);
+    			}
     		}else if(strlen(argv[1]) == 6 && strcmp(argv[1], "commit") == 0){ //commit
     			
     		}else if(strlen(argv[1]) == 4 && strcmp(argv[1], "push") == 0){ //push
@@ -232,26 +262,35 @@ int main(int argc, char** argv) {
     			if(directoryExist(argv[2]) == 0){
     				printf("Fatal Error: Project does not exist to add the file\n");
     			}else{
-    				char* path = generatePath("", argv[3]);
+    				char* path = generatePath(argv[2], argv[3]);
     				printf("%s\n", path);
     				char* hashcode = generateHashCode(path);
+    				char* filepath = malloc(sizeof(char) * (strlen(path) - 1));
+    				memset(filepath, '\0', sizeof(char) * (strlen(path) - 1));
+    				memcpy(filepath, path+2, (sizeof(char) * strlen(path) - 1));
     				if(hashcode == NULL){
     					
     				}else{
-		 				char* temp = createManifestLine("1", argv[3], hashcode, 1, 1); 
-		 				modifyManifest(argv[2], argv[3], 1, temp);    
+		 				char* temp = createManifestLine("1", filepath, hashcode, 1, 1); 
+		 				modifyManifest(argv[2], filepath, 1, temp);    
 		 				//appendToManifest(argv[2], temp);
 		 				free(hashcode);
 		 				free(temp);
     				}
+    				free(filepath);
     				free(path);
     			}
-    			
     		}else if(strlen(argv[1]) == 6 && strcmp(argv[1], "remove") == 0){ //Remove
     			if(directoryExist(argv[2]) == 0){
     				printf("Fatal Error: Project does not exist to remove the file\n");
     			}else{
-    				modifyManifest(argv[2], argv[3], 0, NULL);
+    				char* path = generatePath(argv[2], argv[3]);
+    				char* filepath = malloc(sizeof(char) * (strlen(path) - 1));
+    				memset(filepath, '\0', sizeof(char) * (strlen(path) - 1));
+    				memcpy(filepath, path+2, (sizeof(char) * strlen(path) - 1));
+    				modifyManifest(argv[2], filepath, 0, NULL);
+    				free(filepath);
+    				free(path);
     			}
     		}else if(strlen(argv[1]) == 8 && strcmp(argv[1], "rollback") == 0){ //Rollback
     		
@@ -434,7 +473,7 @@ void update(char* ProjectName, int socketfd){
    }while(read != 0);
    defaultSize = 15;
 	tokenpos = 0;
-	char *token = malloc(sizeof(char) * (defaultSize + 1));
+	char* token = malloc(sizeof(char) * (defaultSize + 1));
    memset(token, '\0', sizeof(char) * (defaultSize + 1));
 	
 	do{
@@ -546,8 +585,163 @@ void update(char* ProjectName, int socketfd){
 	printMLL(serverHead);
 	printf("clientHead:\n");
 	printMLL(clientHead);
-	free(curLine); //CHANGE TO mNode FREE METHOD
+	free(curLine); //CHANGE TO mNode FREE METHOD | Actually should be good
+	free(token);
 	compareManifest(serverHead, clientHead, ProjectName);
+}
+/*
+	TO ADD, update the manifest entry for Append and Modify
+*/
+void upgradeProcess(char* projectName, int upgradefd, int socketfd){
+	char buffer[100] = {'\0'};
+	int bufferPos = 0;
+	
+	int defaultSize = 15;
+	char* token = (char*) malloc(sizeof(char) * (defaultSize + 1));	
+	memset(token, '\0', sizeof(char) * (defaultSize + 1));
+	int tokenpos = 0;
+	/*
+	Mode = 1 -> Delete
+	Mode = 2 -> M/A
+	*/
+	int mode = 0;
+	int empty = 1;
+	int numOfSpace = 0;
+	int read = 0;
+	mNode* mhead = NULL;
+	mNode* curFile = (mNode*) malloc(sizeof(mNode) * 1);
+	curFile->next = NULL;
+	curFile->prev = NULL;
+	char* filepath = NULL;
+	char* hash = NULL;
+	int numberOfFiles = 0;
+	//upgrade$BProjectName$ProjectNameNumOfFiles$BFile1$File1BFile2$
+	//SERVER SENDS: sendFile....THEN SUCCESS OR FAILURE THEN MANIFESTVERSION
+	do{
+		read = bufferFill(upgradefd, buffer, sizeof(buffer));
+		if(read != 0){
+			empty = 0;
+		}
+		for(bufferPos = 0; bufferPos < sizeof(buffer); ++bufferPos){
+			if(buffer[bufferPos] == '\n'){
+				if(mode == 1){
+					modifyManifest(projectName, token, 0, NULL);
+					free(token);
+				}else{
+					curFile->hash = token;
+					mhead = insertMLL(curFile, mhead);
+					numberOfFiles = numberOfFiles + 1;
+					curFile = (mNode*) malloc(sizeof(mNode) * 1);
+				}
+				mode = 0;
+				defaultSize = 25;
+				tokenpos = 0;
+				token = malloc(sizeof(char) * (defaultSize + 1));
+				memset(token, '\0', sizeof(char) * (defaultSize + 1));
+				numOfSpace = 0;
+			}else if(buffer[bufferPos] == ' '){
+				numOfSpace++;
+				if(numOfSpace == 1){
+					if(strcmp("D", token) == 0){
+						mode = 1;
+						free(token);
+					}else if(strcmp("A", token) == 0){
+						mode = 2;
+						curFile->version = token;
+					}else if(strcmp("M", token) == 0){
+						mode = 3;
+						curFile->version = token;
+					}else{
+						printf("Warning: The upgrade file is not properly formatted, %s", token);
+						mode = -1;
+					}
+					defaultSize = 15;
+					tokenpos = 0;
+					token = malloc(sizeof(char) * (defaultSize + 1));
+					memset(token, '\0', sizeof(char) * (defaultSize + 1));
+				}else{
+					if(mode != 1){
+						curFile->filepath = token;
+						defaultSize = 15;
+						tokenpos = 0;
+						token = malloc(sizeof(char) * (defaultSize + 1));
+						memset(token, '\0', sizeof(char) * (defaultSize + 1));
+					}
+				}
+			}else{
+				if(mode != 1){
+					if(tokenpos >= defaultSize){
+						defaultSize = defaultSize * 2;
+						token = doubleStringSize(token, defaultSize);
+					}
+					token[tokenpos] = buffer[bufferPos];
+					tokenpos++;
+				}
+			}		
+		}
+	}while(buffer[0] != '\0' && read != 0);
+	free(curFile);
+	free(token);
+	if(empty){
+		writeToFile(socketfd, "upgrade$");
+		writeToFile(socketfd, "0");
+		//READ SERVER RESPONSE IMPLEMENT
+		printf("Up To Date\n");
+	}else{
+		mNode* temp = mhead;
+		writeToFile(socketfd, "upgrade$");
+		sendLength(socketfd, projectName);
+		char str[5] = {'\0'};
+		sprintf(str, "%d", numberOfFiles);
+		writeToFile(socketfd, str);
+		writeToFile(socketfd, "$");
+		while(temp != NULL){
+			printf("Sending: %s\n", temp->filepath);
+			sendLength(socketfd, temp->filepath);
+			temp = temp->next;
+		}
+		metadataParser(socketfd);
+		printFiles();
+		writeToFileFromSocket(socketfd, listOfFiles); 
+		updateManifestVersion(projectName, socketfd);
+	}
+	free(token);
+	printf("Done\n");
+}
+
+void updateManifestVersion(char* projectName, int socketfd){
+	char* temp = NULL;
+	readNbytes(socketfd, strlen("FAILURE"), NULL, &temp);
+	if(strcmp(temp, "SUCCESS") == 0){
+		char buffer[2] = {'\0'};
+		int bufferPos = 0;
+		int defaultSize = 25;
+		char* token = (char*) malloc(sizeof(char) * (defaultSize + 1));	
+		memset(token, '\0', sizeof(char) * (defaultSize + 1));
+		char* serverManifestVersion = NULL;
+		int tokenpos = 0;
+		int read = 0;
+		do{
+			read = bufferFill(socketfd, buffer, 1);
+			if(buffer[bufferPos] == '$'){
+				int tokenlength = atoi(token);
+				free(token);
+				readNbytes(socketfd, tokenlength, NULL, &serverManifestVersion);
+				break;
+			}else{
+				if(tokenpos >= defaultSize){
+					defaultSize = defaultSize * 2;
+					token = doubleStringSize(token, defaultSize);
+				}
+				token[tokenpos] = buffer[bufferPos];
+				tokenpos++;
+			}
+		}while(buffer[0] != 0 && read != 0);
+		modifyManifest(projectName, NULL, 2, serverManifestVersion);
+		free(serverManifestVersion);
+	}else{
+		printf("Fatal Error: Server could not find the Manifest for this project\n");
+	}
 }
 
 void compareManifest(mNode* serverManifest, mNode* clientManifest, char* ProjectName){
@@ -850,6 +1044,7 @@ void writeToFile(int fd, char* data){
 /*
 	Mode 0: Remove
 	Mode 1: Add
+	Mode 2: Replace Version Number
 */
 void modifyManifest(char* projectName, char* filepath, int mode, char* replace){
 	char* manifest = generateManifestPath(projectName);
@@ -878,6 +1073,7 @@ void modifyManifest(char* projectName, char* filepath, int mode, char* replace){
 	int read = 0;
 	int found = -1;
 	int existed = -1;
+	int manifestVersion = 0;
 	do{
 		read = bufferFill(manifestfd, buffer, sizeof(buffer));
 		for(bufferPos = 0; bufferPos < sizeof(buffer); ++bufferPos){
@@ -888,29 +1084,35 @@ void modifyManifest(char* projectName, char* filepath, int mode, char* replace){
 			token[tokenpos] = buffer[bufferPos];
 			tokenpos++;
 			if(buffer[bufferPos] == '\n'){
-				char* temp = malloc(sizeof(char) * strlen(token));
-				memset(temp, '\0', strlen(token) * sizeof(char));
-				int i = 0;
-				int numofspaces = 0;
-				int temppos = 0;
-				for(i = 0; i < tokenpos; ++i){
-					if(token[i] == ' '){
-						numofspaces++;
-						if(numofspaces == 2){
-							found = strcmp(filepath, temp);
-							if(found == 0){
-								existed = 1;
+				if(mode != 2){
+					char* temp = malloc(sizeof(char) * strlen(token));
+					memset(temp, '\0', strlen(token) * sizeof(char));
+					int i = 0;
+					int numofspaces = 0;
+					int temppos = 0;
+					for(i = 0; i < tokenpos; ++i){
+						if(token[i] == ' '){
+							numofspaces++;
+							if(numofspaces == 2){
+								found = strcmp(filepath, temp);
+								if(found == 0){
+									existed = 1;
+								}
+								break;
 							}
-							break;
+						}else if(numofspaces == 1){
+							temp[temppos] = token[i];
+							temppos++;
 						}
-					}else if(numofspaces == 1){
-						temp[temppos] = token[i];
-						temppos++;
 					}
+					printf("%s\n", temp);
+					free(temp);
 				}
-				printf("%s\n", temp);
-				free(temp);
-				if(found == 0 && mode == 1){
+				
+				if(mode == 2 && manifestVersion == 0){
+					writeToFile(tempmanifestfd, replace);
+					manifestVersion = 1;
+				}else if(found == 0 && mode == 1){
 					writeToFile(tempmanifestfd, replace);
 				}else{
 					if(found != 0){
@@ -929,7 +1131,7 @@ void modifyManifest(char* projectName, char* filepath, int mode, char* replace){
 	
 	close(manifestfd);
 
-	if(existed == -1){
+	if(existed == -1 && mode != 2){
 		if(mode == 1){
 			writeToFile(tempmanifestfd, replace);
 			close(tempmanifestfd);
@@ -942,6 +1144,7 @@ void modifyManifest(char* projectName, char* filepath, int mode, char* replace){
 			printf("%d\n", success);
 		}
 	}else{
+		close(tempmanifestfd);
 		remove(manifest);
 		rename(manifestTemp, manifest);
 	}
@@ -1054,6 +1257,7 @@ char* generateHashCode(char* filepath){
 			previous += 2;
 		}
 		free(hash);
+		close(filefd);
 		return hexhash;
 	}
 }
@@ -1221,7 +1425,13 @@ char** getConfig(){
 	}while((buffer[0] != '\0' && finished == 0) && read != 0);
 	return information;
 }
-
+void printFiles(){
+	fileNode* temp = listOfFiles;
+	while(temp != NULL){
+		printf("File: %s with path of %s and length of %llu\n", temp->filename, temp->filepath, temp->filelength);
+		temp = temp->next;
+	}
+}
 
 void freeFileNodes(){
 	while(listOfFiles != NULL){
