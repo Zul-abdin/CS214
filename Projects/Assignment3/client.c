@@ -55,6 +55,7 @@ void appendToManifest(char* ProjectName, char* token);
 char* createManifestLine(char* version, char* filepath, char* hashcode, int local, int mode);
 char* generateManifestPath(char* projectName);
 void modifyManifest(char* projectName, char* filepath, int mode, char* replace);
+int readManifest(char* projectName, int socketfd, int length, mNode** head);
 char* generateHashCode(char* filepath);
 mNode* insertMLL(mNode* newNode, mNode* head);
 void printMLL(mNode* head);
@@ -68,6 +69,7 @@ void compareManifest(mNode* serverManifest, mNode* clientManifest, char* Project
 int checkVersionAndHash(mNode* serverNode, mNode* clientNode, char* projectName, int updateFilefd, int conflictFilefd);
 void updateManifestVersion(char* projectName, int socketfd);
 void printFiles();
+int getLength(int socketfd);
 /*
 	File Sending Methods
 */
@@ -92,6 +94,7 @@ void upgradeProcess(char* projectName, int upgradefd, int socketfd);
 
 fileNode* listOfFiles = NULL;
 int numOfFiles = 0;
+int version = -1;
 
 int main(int argc, char** argv) {
     if(argc != 4 && argc != 3){
@@ -681,7 +684,6 @@ void upgradeProcess(char* projectName, int upgradefd, int socketfd){
 		}
 	}while(buffer[0] != '\0' && read != 0);
 	free(curFile);
-	free(token);
 	if(empty){
 		writeToFile(socketfd, "upgrade$");
 		writeToFile(socketfd, "0");
@@ -696,6 +698,16 @@ void upgradeProcess(char* projectName, int upgradefd, int socketfd){
 		writeToFile(socketfd, str);
 		writeToFile(socketfd, "$");
 		while(temp != NULL){
+			int tempfd = open(temp->filepath, O_RDONLY);
+			if(tempfd == -1){
+				char* filepathTEMP = strdup(temp->filepath);
+				char* subdirectories = dirname(filepathTEMP);
+				makeNestedDirectories(subdirectories);
+				free(filepathTEMP);
+			}else{
+				close(tempfd);
+				remove(temp->filepath);
+			}
 			printf("Sending: %s\n", temp->filepath);
 			sendLength(socketfd, temp->filepath);
 			temp = temp->next;
@@ -704,9 +716,130 @@ void upgradeProcess(char* projectName, int upgradefd, int socketfd){
 		printFiles();
 		writeToFileFromSocket(socketfd, listOfFiles); 
 		updateManifestVersion(projectName, socketfd);
+		temp = mhead;
+		while(temp != NULL){
+		//modifyManifest(char* projectName, char* filepath, int mode, char* replace)
+			modifyManifest(projectName, temp->filepath, 0, NULL);
+			temp = temp->next;
+		}
+		mNode* serverManifest = NULL;
+		int serverManifestLength = getLength(socketfd);
+		readManifest(projectName, socketfd, serverManifestLength, &serverManifest);
+		printf("Printing Server Manifest\n");
+		printMLL(serverManifest);
+		if(serverManifest != NULL){
+			quickSort(serverManifest, strcomp);
+			temp = mhead;
+			while(temp != NULL){
+				mNode* tempServer = serverManifest;
+				while(tempServer != NULL){
+					if(strcmp(tempServer->filepath, temp->filepath) == 0){
+						char* replace = createManifestLine(tempServer->version, tempServer->filepath, tempServer->hash, 0, 0);
+						modifyManifest(projectName, temp->filepath, 1, replace);
+						free(replace);
+						break;
+					}
+					tempServer = tempServer->next;
+				}
+				temp = temp->next;
+			}
+		}
 	}
 	free(token);
 	printf("Done\n");
+}
+
+int getLength(int socketfd){
+	char buffer[2] = {'\0'};
+	int defaultSize = 15;
+	char* token = (char*) malloc(sizeof(char) * (defaultSize + 1));	
+	memset(token, '\0', sizeof(char) * (defaultSize + 1));
+	int tokenpos = 0;
+	int bufferPos = 0;
+	int length = -1;
+	int read = 0;
+	do{
+		read = bufferFill(socketfd, buffer, 1);
+		if(buffer[0] == '$'){
+			length = atoi(token);
+			free(token);
+			break;
+		}else{
+			if(tokenpos >= defaultSize){
+				defaultSize = defaultSize * 2;
+				token = doubleStringSize(token, defaultSize);
+			}
+			token[tokenpos] = buffer[0];
+			tokenpos++;
+		}
+	}while(read != 0 && buffer[0] != '\0');
+	return length;
+}
+
+int readManifest(char* projectName, int socketfd, int length, mNode** head){
+	char buffer[100] = {'\0'};
+	int bufferPos = 0;
+	int defaultSize = 25;
+	char* token = (char*) malloc(sizeof(char) * (defaultSize + 1));	
+	memset(token, '\0', sizeof(char) * (defaultSize + 1));
+	int tokenpos = 0;
+	int read = 0;
+	int version = -1;
+	int numOfSpaces = 0;
+	int foundManifestVersion = 0;
+	mNode* curEntry = malloc(sizeof(mNode) * 1);
+	do{
+		int control = 0;
+		if(length != -1){
+			if(sizeof(buffer) > length){
+				memset(buffer, '\0', sizeof(buffer));
+				read = bufferFill(socketfd, buffer, length);
+			}
+			length = length - read;
+			control = read;
+		}else{
+			read = bufferFill(socketfd, buffer, sizeof(buffer));
+			control = read;
+		}
+		for(bufferPos = 0; bufferPos < control; ++bufferPos){
+			if(buffer[bufferPos] == '\n'){
+				if(foundManifestVersion){
+					curEntry->hash = token;
+					(*head) = insertMLL(curEntry, (*head));
+					curEntry = (mNode*) malloc(sizeof(mNode) * 1);
+				}else{
+					foundManifestVersion = 1;
+					version = atoi(token);
+					free(token);
+				}
+				tokenpos = 0;
+				defaultSize = 25;
+				token = (char*) malloc(sizeof(char) * (defaultSize + 1));	
+				memset(token, '\0', sizeof(char) * (defaultSize + 1));
+			}else if(buffer[bufferPos] == ' '){
+				numOfSpaces++;
+		    	if(numOfSpaces == 1){
+		    		curEntry->version = token;
+		    	}else if(numOfSpaces == 2){
+		    		curEntry->filepath = token;
+		    	}
+		    	defaultSize = 25;
+		    	token = malloc(sizeof(char) * (defaultSize + 1));
+   			memset(token, '\0', sizeof(char) * (defaultSize + 1));
+   			tokenpos = 0;
+			}else{
+				if(tokenpos >= defaultSize){
+					defaultSize = defaultSize * 2;
+					token = doubleStringSize(token, defaultSize);
+				}
+				token[tokenpos] = buffer[bufferPos];
+				tokenpos++;
+			}
+		}
+	}while(buffer[0] != '\0' && read == 0);
+	free(token);
+	free(curEntry);
+	return version;
 }
 
 void updateManifestVersion(char* projectName, int socketfd){
@@ -963,7 +1096,7 @@ void writeToFileFromSocket(int socketfd, fileNode* files){
 		char buffer[100] = {'\0'};
 		int filelength = file->filelength;
 		int read = 0;
-		int filefd = open(file->filepath, O_WRONLY | O_CREAT,  S_IRUSR | S_IWUSR);
+		int filefd = open(file->filepath, O_WRONLY | O_CREAT | O_TRUNC,  S_IRUSR | S_IWUSR);
 		if(filefd == -1){
 			printf("Fatal Error: Could not write to File from the Socket because File did not exist or no permissions\n");
 		}

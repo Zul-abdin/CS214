@@ -61,7 +61,7 @@ char* pathCreator(char* path, char* name);
 int makeDirectory(char* directoryName);
 void makeNestedDirectories(char* path);
 int directoryTraverse(char* path, int mode, int fd);
-void calculateFileBytes(char* fileName, fileNode* file);
+long long calculateFileBytes(char* fileName);
 fileNode* createFileNode(char* filepath, char* filename);
 void readManifestFiles(char* projectName, int mode, int clientfd);
 char* createManifestLine(char* version, char* filepath, char* hashcode, int local, int mode);
@@ -447,8 +447,19 @@ void upgrade(char* projectName, int clientfd){
 		}
 	}while(read != 0 && buffer[0] != '\0');
 	sendFilesToClient(clientfd, listOfFiles, numOfFiles);
-	
 	getManifestVersion(projectName, clientfd);
+	char* manifest = generateManifestPath(projectName);
+	int manifestfd = open(manifest, O_RDONLY);
+	if(manifestfd != -1){
+		long long fileBytes = calculateFileBytes(manifest);
+		char filebytes[256] = {'\0'};
+		sprintf(filebytes, "%lld", fileBytes);
+		writeToFile(clientfd, filebytes);
+		writeToFile(clientfd, "$");
+		sendFile(clientfd, manifest);
+		close(manifestfd);
+	}
+	free(manifest);
 }
 
 void createManifest(int fd, char* directorypath){
@@ -930,14 +941,14 @@ int bufferFill(int fd, char* buffer, int bytesToRead){
     	return bytesRead;
 }
 
-void calculateFileBytes(char* fileName, fileNode* file){
+long long calculateFileBytes(char* fileName){
 	struct stat fileinfo;
 	bzero((char*)&fileinfo, sizeof(struct stat));
 	int success = stat(fileName, &fileinfo);
 	if(success == -1){
 		printf("Error: File not found or lacking permissions to access file to get metadata\n");
 	}else{
-		file->filelength = (long long) fileinfo.st_size;
+		return (long long) fileinfo.st_size;
 	}
 }
 
@@ -945,7 +956,7 @@ fileNode* createFileNode(char* filepath, char* filename){
 	fileNode* newNode = (fileNode*) malloc(sizeof(fileNode) * 1);
 	newNode->filepath = filepath;
 	newNode->filename = filename;
-	calculateFileBytes(filepath, newNode);
+	newNode->filelength = calculateFileBytes(filepath);
 	newNode->next = NULL;
 	newNode->prev = NULL;
 	return newNode;
