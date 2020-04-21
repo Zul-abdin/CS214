@@ -83,6 +83,7 @@ void createManifest(int fd, char* directorypath);
 void destroyProject(char* directoryName, int clientfd);
 void update(char* projectName, int clientfd);
 void upgrade(char* projectName, int clientfd);
+void commit(char* projectName, int clientfd);
 
 userNode* pthreadHead = NULL;
 
@@ -164,6 +165,16 @@ void* metadataParser(void* clientfdptr){
 				mode = token;
 				printf("%s\n", mode);
 				pthread_mutex_lock(&lockRepo);
+			}else if(strcmp(mode, "commit") == 0){
+				printf("Getting the project name to retrieve the manifest version for commit\n");
+				fileLength = atoi(token);
+				free(token);
+				char* temp = NULL;
+				readNbytes(clientfd, fileLength, NULL, &temp);
+				commit(temp, clientfd);
+				
+				
+				free(temp);
 			}else if(strcmp(mode, "getManifestVersion") == 0){
 				printf("Getting the project name to retrieve the manifest version\n");
 				fileLength = atoi(token);
@@ -176,9 +187,8 @@ void* metadataParser(void* clientfdptr){
 				fileLength = atoi(token);
 				free(token);
 				if(fileLength == 0){
-					printf("Entered\n");
 					writeToFile(clientfd, "SUCCESS");
-					printf("Done");
+					printf("Successful upgrade\n");
 				}else{ 
 					printf("Getting the project's files to update\n");
 					char* temp = NULL;
@@ -393,6 +403,29 @@ void update(char* projectName, int clientfd){
 	}
 }
 
+void commit(char* projectName, int clientfd){
+	char* manifest = generateManifestPath(projectName);
+	int fd = open(manifest, O_RDONLY);
+	free(manifest);
+	if(fd == -1){
+		printf("Project's Manifest does not exist or could not open, sending error to client\n");
+		writeToFile(clientfd, "FAILURE");
+	}else{
+		printf("Project's Manifest found, sending to client\n");
+		writeToFile(clientfd, "SUCCESS");
+		sendManifest(projectName, clientfd);
+		char* sameVersion = NULL;
+		readNbytes(clientfd, strlen("FAILURE"), NULL, &sameVersion);
+		if(strcmp(sameVersion, "SUCCESS") == 0){
+			
+		}else if(strcmp(sameVersion, "FAILURE") == 0){
+			printf("Warning: The Client had a different manifest version than the server, successfully completed the commit\n");
+		}else{
+			printf("Error: Not sure what the Client Sent %s\n", sameVersion);
+		}
+	}
+}
+
 void upgrade(char* projectName, int clientfd){
 	char buffer[2] = {'\0'}; 
 	int defaultSize = 15;
@@ -451,6 +484,8 @@ void upgrade(char* projectName, int clientfd){
 	char* manifest = generateManifestPath(projectName);
 	int manifestfd = open(manifest, O_RDONLY);
 	if(manifestfd != -1){
+		writeToFile(clientfd, "SUCCESS");
+		printf("Successfully Located the Project's Manifest for upgrade\n");
 		long long fileBytes = calculateFileBytes(manifest);
 		char filebytes[256] = {'\0'};
 		sprintf(filebytes, "%lld", fileBytes);
@@ -458,6 +493,9 @@ void upgrade(char* projectName, int clientfd){
 		writeToFile(clientfd, "$");
 		sendFile(clientfd, manifest);
 		close(manifestfd);
+	}else{
+		printf("Fatal Error: Failed to Locate the Project's Manifest for upgrade\n");
+		writeToFile(clientfd, "FAILURE");
 	}
 	free(manifest);
 }

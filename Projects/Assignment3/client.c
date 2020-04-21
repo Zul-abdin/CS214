@@ -90,7 +90,7 @@ int bufferFill(int fd, char* buffer, int bytesToRead);
 void createProject(char* directoryName, int socketfd);
 void update(char* ProjectName, int socketfd);
 void upgradeProcess(char* projectName, int upgradefd, int socketfd);
-
+void commit(char* ProjectName, int socketfd);
 
 fileNode* listOfFiles = NULL;
 int numOfFiles = 0;
@@ -128,6 +128,10 @@ int main(int argc, char** argv) {
     			
     			}
     		}else if(strlen(argv[1]) == 6 && strcmp(argv[1], "update") == 0){ //UPDATE
+    			if(directoryExist(argv[2]) == 0){
+    				printf("Fatal Error: Project does not exist to update\n");
+    				return 0;
+    			}
     			int socketfd = setupConnection();
     			if(socketfd > 0){
     				writeToFile(socketfd, "update$");
@@ -176,7 +180,46 @@ int main(int argc, char** argv) {
     				free(updateFile);
     			}
     		}else if(strlen(argv[1]) == 6 && strcmp(argv[1], "commit") == 0){ //commit
-    			
+    			if(directoryExist(argv[2]) == 0){
+    				printf("Fatal Error: Project does not exist to update\n");
+    				return 0;
+    			}
+    			char* conflictFile = generatePath(argv[2], "/Conflict"); //Check later
+    			int conflictFd = open(conflictFile, O_RDONLY);
+    			if(conflictFd != -1){
+    				printf("Fatal Error: Please resolve Conflicts before commit\n");
+    				close(conflictFd);
+    				free(conflictFile);
+    			}else{
+    				free(conflictFile);
+    				char* updateFile = generatePath(argv[2], "/Update");
+    				int updateFd = open(updateFile, O_RDONLY);
+    				if(updateFd != -1){
+    					int read = 0;
+    					char buffer[10] = {'\0'};
+    					read = bufferFill(updateFd, buffer, sizeof(buffer)); 
+    					if(read != 0){
+    						printf("Fatal Error: Update File is not empty for commit\n");
+    					}
+    					close(updateFd);
+    				}else{
+    					int socketfd = setupConnection();
+    					if(socketfd > 0){
+		 					writeToFile(socketfd, "commit$");
+							sendLength(socketfd, argv[2]);
+		 					char* temp = NULL;
+							readNbytes(socketfd, strlen("FAILURE"), NULL, &temp);
+							if(strcmp(temp, "SUCCESS") == 0){
+								commit(argv[2], socketfd);
+		 					}else if(strcmp(temp , "FAILURE") == 0){
+		 						printf("Fatal Error: Server failed to find the project's manifest\n");
+		 					}else{
+		 						printf("Error: Could not interpret the server's response\n");
+		 					}
+		 				}
+    				}
+    				free(updateFile);		
+    			}
     		}else if(strlen(argv[1]) == 4 && strcmp(argv[1], "push") == 0){ //push
     			
     		}else if(strlen(argv[1]) == 6 && strcmp(argv[1], "create") == 0){ //create
@@ -711,26 +754,32 @@ void upgradeProcess(char* projectName, int upgradefd, int socketfd){
 		}
 		*/
 		mNode* serverManifest = NULL;
-		int serverManifestLength = getLength(socketfd);
-		readManifest(projectName, socketfd, serverManifestLength, &serverManifest);
-		printf("Printing Server Manifest\n");
-		printMLL(serverManifest);
-		if(serverManifest != NULL){
-			quickSort(serverManifest, strcomp);
-			temp = mhead;
-			while(temp != NULL){
-				mNode* tempServer = serverManifest;
-				while(tempServer != NULL){
-					if(strcmp(tempServer->filepath, temp->filepath) == 0){
-						char* replace = createManifestLine(tempServer->version, tempServer->filepath, tempServer->hash, 0, 0);
-						modifyManifest(projectName, temp->filepath, 3, replace);
-						free(replace);
-						break;
+		char* foundServerManifest = NULL;
+		readNbytes(socketfd, strlen("FAILURE"), NULL, &foundServerManifest);
+		if(strcmp(foundServerManifest, "SUCCESS") == 0){
+			int serverManifestLength = getLength(socketfd);
+			readManifest(projectName, socketfd, serverManifestLength, &serverManifest);
+			printf("Printing Server Manifest\n");
+			printMLL(serverManifest);
+			if(serverManifest != NULL){
+				quickSort(serverManifest, strcomp);
+				temp = mhead;
+				while(temp != NULL){
+					mNode* tempServer = serverManifest;
+					while(tempServer != NULL){
+						if(strcmp(tempServer->filepath, temp->filepath) == 0){
+							char* replace = createManifestLine(tempServer->version, tempServer->filepath, tempServer->hash, 0, 0);
+							modifyManifest(projectName, temp->filepath, 3, replace);
+							free(replace);
+							break;
+						}
+						tempServer = tempServer->next;
 					}
-					tempServer = tempServer->next;
+					temp = temp->next;
 				}
-				temp = temp->next;
 			}
+		}else if(strcmp(foundServerManifest, "FAILURE") == 0){
+			printf("Fatal Error: Server could not find the Manifest\n");
 		}
 	}
 	free(token);
@@ -830,6 +879,30 @@ int readManifest(char* projectName, int socketfd, int length, mNode** head){
 	return version;
 }
 
+void commit(char* projectName, int socketfd){
+	char* foundServerManifest = NULL;
+	readNbytes(socketfd, strlen("FAILURE"), NULL, &foundServerManifest);
+	if(strcmp(foundServerManifest, "SUCCESS") == 0){
+		metadataParser(socketfd);
+		mNode* serverManifest = NULL;
+		int serverManifestLength = listOfFiles->filelength;
+		int serverManifestVersion = readManifest(projectName, socketfd, serverManifestLength, &serverManifest);
+		mNode* clientManifest = NULL;
+		int clientManifestVersion = readManifest(projectName, socketfd, -1, &clientManifest);
+		if(clientManifestVersion == serverManifestVersion){
+			writeToFile(socketfd, "SUCCESS");
+			
+		}else{
+			writeToFile(socketfd, "FAILURE");
+			printf("Fatal Error: Server and Client Manifest Versions are not the same, please update before calling commit\n");
+		}
+		
+		
+	}else if(strcmp(foundServerManifest, "FAILURE") == 0){
+		printf("Fatal Error: Server failed to locate the Manifest\n");
+	}
+}
+
 void updateManifestVersion(char* projectName, int socketfd){
 	char* temp = NULL;
 	readNbytes(socketfd, strlen("FAILURE"), NULL, &temp);
@@ -925,6 +998,7 @@ void compareManifest(mNode* serverManifest, mNode* clientManifest, char* Project
 	if(conflict == 0){
 		remove(conflictFile);
 	}else{
+		printf("Warning: Project could not be updated: All the conflicts must be resolved before the project is updated\n");
 		remove(updateFile);
 	}
 	free(conflictFile);
