@@ -265,35 +265,22 @@ int main(int argc, char** argv) {
     			if(directoryExist(argv[2]) == 0){
     				printf("Fatal Error: Project does not exist to add the file\n");
     			}else{
-    				char* path = generatePath(argv[2], argv[3]);
-    				printf("%s\n", path);
-    				char* hashcode = generateHashCode(path);
-    				char* filepath = malloc(sizeof(char) * (strlen(path) - 1));
-    				memset(filepath, '\0', sizeof(char) * (strlen(path) - 1));
-    				memcpy(filepath, path+2, (sizeof(char) * strlen(path) - 1));
+    				char* hashcode = generateHashCode(argv[3]);
     				if(hashcode == NULL){
     					
     				}else{
-		 				char* temp = createManifestLine("1", filepath, hashcode, 1, 1); 
-		 				modifyManifest(argv[2], filepath, 1, temp);    
+		 				char* temp = createManifestLine("1", argv[3], hashcode, 1, 1); 
+		 				modifyManifest(argv[2], argv[3], 1, temp);    
 		 				//appendToManifest(argv[2], temp);
 		 				free(hashcode);
 		 				free(temp);
     				}
-    				free(filepath);
-    				free(path);
     			}
     		}else if(strlen(argv[1]) == 6 && strcmp(argv[1], "remove") == 0){ //Remove
     			if(directoryExist(argv[2]) == 0){
     				printf("Fatal Error: Project does not exist to remove the file\n");
     			}else{
-    				char* path = generatePath(argv[2], argv[3]);
-    				char* filepath = malloc(sizeof(char) * (strlen(path) - 1));
-    				memset(filepath, '\0', sizeof(char) * (strlen(path) - 1));
-    				memcpy(filepath, path+2, (sizeof(char) * strlen(path) - 1));
-    				modifyManifest(argv[2], filepath, 0, NULL);
-    				free(filepath);
-    				free(path);
+    				modifyManifest(argv[2], argv[3], 0, NULL);
     			}
     		}else if(strlen(argv[1]) == 8 && strcmp(argv[1], "rollback") == 0){ //Rollback
     		
@@ -717,11 +704,12 @@ void upgradeProcess(char* projectName, int upgradefd, int socketfd){
 		writeToFileFromSocket(socketfd, listOfFiles); 
 		updateManifestVersion(projectName, socketfd);
 		temp = mhead;
-		while(temp != NULL){
+		/*while(temp != NULL){
 		//modifyManifest(char* projectName, char* filepath, int mode, char* replace)
 			modifyManifest(projectName, temp->filepath, 0, NULL);
 			temp = temp->next;
 		}
+		*/
 		mNode* serverManifest = NULL;
 		int serverManifestLength = getLength(socketfd);
 		readManifest(projectName, socketfd, serverManifestLength, &serverManifest);
@@ -735,7 +723,7 @@ void upgradeProcess(char* projectName, int upgradefd, int socketfd){
 				while(tempServer != NULL){
 					if(strcmp(tempServer->filepath, temp->filepath) == 0){
 						char* replace = createManifestLine(tempServer->version, tempServer->filepath, tempServer->hash, 0, 0);
-						modifyManifest(projectName, temp->filepath, 1, replace);
+						modifyManifest(projectName, temp->filepath, 3, replace);
 						free(replace);
 						break;
 					}
@@ -936,6 +924,8 @@ void compareManifest(mNode* serverManifest, mNode* clientManifest, char* Project
 	close(updateFilefd);
 	if(conflict == 0){
 		remove(conflictFile);
+	}else{
+		remove(updateFile);
 	}
 	free(conflictFile);
 	free(updateFile);
@@ -985,17 +975,15 @@ int checkVersionAndHash(mNode* serverNode, mNode* clientNode, char* projectName,
 			return -1;
 		}
 		if(strcmp(livehash, clientCurNode->hash) != 0){
-			if(strcmp(livehash,serverCurNode->hash) != 0){
-				printf("C %s\n", clientCurNode->filepath);
-				writeToFile(conflictFilefd, "C ");
-				writeToFile(conflictFilefd, serverCurNode->filepath);
-				writeToFile(conflictFilefd, " ");
-				writeToFile(conflictFilefd, livehash);
-				writeToFile(conflictFilefd, "\n");
-				free(temp);
-				free(livehash);
-				return 2;
-			}//What if it is equal to server hash, what to do?
+			printf("C %s\n", clientCurNode->filepath);
+			writeToFile(conflictFilefd, "C ");
+			writeToFile(conflictFilefd, serverCurNode->filepath);
+			writeToFile(conflictFilefd, " ");
+			writeToFile(conflictFilefd, livehash);
+			writeToFile(conflictFilefd, "\n");
+			free(temp);
+			free(livehash);
+			return 2;
 		}else{
 			printf("M %s\n", serverCurNode->filepath);
 			writeToFile(updateFilefd, "M ");
@@ -1178,6 +1166,7 @@ void writeToFile(int fd, char* data){
 	Mode 0: Remove
 	Mode 1: Add
 	Mode 2: Replace Version Number
+	Mode 3: Replace 
 */
 void modifyManifest(char* projectName, char* filepath, int mode, char* replace){
 	char* manifest = generateManifestPath(projectName);
@@ -1245,7 +1234,9 @@ void modifyManifest(char* projectName, char* filepath, int mode, char* replace){
 				if(mode == 2 && manifestVersion == 0){
 					writeToFile(tempmanifestfd, replace);
 					manifestVersion = 1;
-				}else if(found == 0 && mode == 1){
+				}else if(mode == 1){
+					writeToFile(tempmanifestfd, token);
+				}else if(mode == 3 && found == 0){
 					writeToFile(tempmanifestfd, replace);
 				}else{
 					if(found != 0){
@@ -1265,21 +1256,27 @@ void modifyManifest(char* projectName, char* filepath, int mode, char* replace){
 	close(manifestfd);
 
 	if(existed == -1 && mode != 2){
-		if(mode == 1){
+		if(mode == 1 || mode == 3){
 			writeToFile(tempmanifestfd, replace);
 			close(tempmanifestfd);
 			remove(manifest);
 			rename(manifestTemp, manifest);
 		}else{
-			printf("Warning: The file is not listed in the Manifest\n");
+			printf("Warning: The file is not listed in the Manifest to remove\n");
 			close(tempmanifestfd);
 			int success = remove(manifestTemp);
 			printf("%d\n", success);
 		}
 	}else{
-		close(tempmanifestfd);
-		remove(manifest);
-		rename(manifestTemp, manifest);
+		if(mode == 1 && existed == 1){
+			printf("Error: File entry already existed in the Manifest and therefore could not be added\n");
+			close(tempmanifestfd);
+			remove(manifestTemp);
+		}else{
+			close(tempmanifestfd);
+			remove(manifest);
+			rename(manifestTemp, manifest);
+		}
 	}
 	free(token);
 	free(manifest);
