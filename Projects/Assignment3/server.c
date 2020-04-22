@@ -28,12 +28,21 @@ typedef struct _userNode_{
 	struct _userNode_* next;
 }userNode;
 
+typedef struct _commitNode_{
+	char* pName;
+	char* clientid;
+	char* commit;
+	struct _commitNode_* next;
+	struct _commitNode_* prev;
+}commitNode;
+
 /*
 	Clean up Methods
 */
 void sighandler(int sig);
 void unloadMemory();
 void freeFileNodes();
+void freeCommitNode(commitNode* node);
 /*
 	Setup Server Methods
 */
@@ -73,7 +82,8 @@ char* generateHashCode(char* filepath);
 void insertThreadLL(pthread_t node);
 void sendLength(int socketfd, char* token);
 void getManifestVersion(char* projectName, int clientfd);
-
+int getLength(int socketfd);
+void printActiveCommits();
 /*
 	Command Methods
 */
@@ -84,10 +94,13 @@ void destroyProject(char* directoryName, int clientfd);
 void update(char* projectName, int clientfd);
 void upgrade(char* projectName, int clientfd);
 void commit(char* projectName, int clientfd);
+void insertCommit(char* clientid, char* projectName, char* commit, int clientfd);
+
 
 userNode* pthreadHead = NULL;
-
 fileNode* listOfFiles = NULL;
+commitNode* activeCommit = NULL;
+int assignedCommits = 0;
 int numOfFiles = 0;
 
 pthread_mutex_t lockRepo;
@@ -417,13 +430,108 @@ void commit(char* projectName, int clientfd){
 		char* sameVersion = NULL;
 		readNbytes(clientfd, strlen("FAILURE"), NULL, &sameVersion);
 		if(strcmp(sameVersion, "SUCCESS") == 0){
-			
+			free(sameVersion);
+			sameVersion = NULL;
+			readNbytes(clientfd, strlen("FAILURE"), NULL, &sameVersion);
+			if(strcmp(sameVersion, "SUCCESS") == 0){
+				printf("Client successfully completed commit and is sending the .commit file\n");
+				int tokenlength = getLength(clientfd);
+				char* clientid = NULL;
+				readNbytes(clientfd, tokenlength, NULL, &clientid);
+				tokenlength = getLength(clientfd);
+				char* commitProjectName = NULL;
+				readNbytes(clientfd, tokenlength, NULL, &commitProjectName);
+				tokenlength = getLength(clientfd);
+				char* commitToken = NULL;
+				readNbytes(clientfd, tokenlength, NULL, &commitToken);
+				insertCommit(clientid, commitProjectName, commitToken, clientfd);
+			}else if(strcmp(sameVersion, "FAILURE") == 0){
+				printf("Warning: Client did not successfully create commit, either the client could not create commit or client had an outdated version, succesfully completed commit\n");
+			}else if(strcmp(sameVersion, "UPDATED") == 0){
+				printf("Warning: The Client and Server have no file entries in their Manifest\n");
+			}else{
+				printf("Error: Not sure what the Client send %s\n", sameVersion);
+			}
 		}else if(strcmp(sameVersion, "FAILURE") == 0){
 			printf("Warning: The Client had a different manifest version than the server, successfully completed the commit\n");
 		}else{
 			printf("Error: Not sure what the Client Sent %s\n", sameVersion);
 		}
+		free(sameVersion);
 	}
+}
+
+void insertCommit(char* clientid, char* projectName, char* commit, int clientfd){
+	commitNode* newNode = malloc(sizeof(commitNode) * 1);
+	if(strcmp(clientid, "-1") == 0){
+		printf("New client detected and wants to do a commit, generating clientid for them\n");
+		free(clientid);
+		int length = snprintf(NULL, 0, "%d", assignedCommits);
+		clientid = (char*) malloc(sizeof(char) * length + 1);
+		memset(clientid, '\0', sizeof(char) * length + 1);
+		sprintf(clientid, "%d", assignedCommits);
+		printf("Assigning clientid: %d\n", assignedCommits);
+		assignedCommits = assignedCommits + 1;
+	}
+	
+	newNode->clientid = clientid;
+	newNode->commit = commit;
+	newNode->pName = projectName;
+	newNode->next = NULL;
+	newNode->prev = NULL;
+	int found = 0;
+	if(activeCommit == NULL){
+		activeCommit = newNode;
+	}else{
+		commitNode* temp = activeCommit;
+		commitNode* prevNode = temp;
+		while(temp != NULL){
+			prevNode = temp;
+			if(strcmp(temp->pName, newNode->pName) == 0 && strcmp(temp->clientid, newNode->clientid) == 0){
+				
+				printf("Found a duplicate commit for the same project for the same client, replacing\n");
+				if(temp->prev != NULL){
+					temp->prev->next = newNode;
+					newNode->prev = temp->prev;
+				}
+				if(temp->next != NULL){
+					temp->next->prev = newNode;
+					newNode->next = temp->next;
+				}
+				if(temp == activeCommit){
+					activeCommit = newNode;
+				}
+				freeCommitNode(temp);
+				found = 1;
+				break;
+			}
+			temp = temp->next;
+		}
+		if(found == 0){
+			prevNode->next = newNode;
+			newNode->prev = prevNode;
+		}
+	}
+	sendLength(clientfd, clientid);
+	writeToFile(clientfd, "SUCCESS");
+	printf("Successfully stored: %s\nbelongs to %s for %s\n", newNode->commit, newNode->clientid, newNode->pName);
+	printf("\n\n\nActive Commits:\n\n\n");
+	printActiveCommits();
+}
+
+void printActiveCommits(){
+	commitNode* curNode = activeCommit;
+	while(curNode != NULL){
+		printf("Currently stored: %s\nbelongs to client%s for Project %s\n", curNode->commit, curNode->clientid, curNode->pName);
+		curNode = curNode->next;
+	}
+}
+
+void freeCommitNode(commitNode* node){
+	free(node->clientid);
+	free(node->pName);
+	free(node->commit);
+	free(node);
 }
 
 void upgrade(char* projectName, int clientfd){
@@ -977,6 +1085,33 @@ int bufferFill(int fd, char* buffer, int bytesToRead){
         bytesRead += status;
     }while(bytesRead < bytesToRead);
     	return bytesRead;
+}
+
+int getLength(int socketfd){
+	char buffer[2] = {'\0'};
+	int defaultSize = 15;
+	char* token = (char*) malloc(sizeof(char) * (defaultSize + 1));	
+	memset(token, '\0', sizeof(char) * (defaultSize + 1));
+	int tokenpos = 0;
+	int bufferPos = 0;
+	int length = -1;
+	int read = 0;
+	do{
+		read = bufferFill(socketfd, buffer, 1);
+		if(buffer[0] == '$'){
+			length = atoi(token);
+			free(token);
+			break;
+		}else{
+			if(tokenpos >= defaultSize){
+				defaultSize = defaultSize * 2;
+				token = doubleStringSize(token, defaultSize);
+			}
+			token[tokenpos] = buffer[0];
+			tokenpos++;
+		}
+	}while(read != 0 && buffer[0] != '\0');
+	return length;
 }
 
 long long calculateFileBytes(char* fileName){
