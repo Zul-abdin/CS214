@@ -820,6 +820,7 @@ int getLength(int socketfd){
 	return length;
 }
 
+
 int readManifest(char* projectName, int socketfd, int length, mNode** head){
 	char buffer[100] = {'\0'};
 	int bufferPos = 0;
@@ -858,6 +859,7 @@ int readManifest(char* projectName, int socketfd, int length, mNode** head){
 				}
 				tokenpos = 0;
 				defaultSize = 25;
+				numOfSpaces = 0;
 				token = (char*) malloc(sizeof(char) * (defaultSize + 1));	
 				memset(token, '\0', sizeof(char) * (defaultSize + 1));
 			}else if(buffer[bufferPos] == ' '){
@@ -880,7 +882,7 @@ int readManifest(char* projectName, int socketfd, int length, mNode** head){
 				tokenpos++;
 			}
 		}
-	}while(buffer[0] != '\0' && read == 0);
+	}while(buffer[0] != '\0' && read != 0);
 	free(token);
 	free(curEntry);
 	return version;
@@ -904,6 +906,11 @@ void commit(char* projectName, int socketfd){
 	int clientManifestVersion = readManifest(projectName, manifestfd, -1, &clientManifest);
 	if(clientManifestVersion == serverManifestVersion){
 		writeToFile(socketfd, "SUCCESS");
+		printf("BEFORE serverManifest:\n"); //DEBUGGING
+		printMLL(serverManifest);
+		printf("BEFORE clientManifest:\n");
+		printMLL(clientManifest);
+		
 		if(serverManifest != NULL){
 			quickSort(serverManifest, strcomp);
 		}
