@@ -199,16 +199,18 @@ void* metadataParser(void* clientfdptr){
 			}else if(strcmp(mode, "upgrade") == 0){
 				fileLength = atoi(token);
 				free(token);
+				char* projectName = NULL;
+				readNbytes(clientfd, fileLength, NULL, &projectName);
+				getManifestVersion(projectName, clientfd);
+				fileLength = getLength(clientfd);
 				if(fileLength == 0){
 					writeToFile(clientfd, "SUCCESS");
-					printf("Successful upgrade\n");
+					printf("Successful upgrade, either the project's version did not match or the client is up to date to the server\n");
 				}else{ 
 					printf("Getting the project's files to update\n");
-					char* temp = NULL;
-					readNbytes(clientfd, fileLength, NULL, &temp);
-					upgrade(temp, clientfd);
-					free(temp);
+					upgrade(projectName, clientfd);
 				}
+				free(projectName);
 				break;
 			}else if(strcmp(mode, "update") == 0){
 				printf("Getting the project to update\n");
@@ -218,6 +220,7 @@ void* metadataParser(void* clientfdptr){
 				readNbytes(clientfd, fileLength, NULL, &temp);
 				update(temp, clientfd);
 				free(temp);
+				printf("Finished with update\n");
 				break;
 			}else if(strcmp(mode, "destroy") == 0){
 				printf("Getting the project to destroy\n");

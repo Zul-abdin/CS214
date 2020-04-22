@@ -65,7 +65,7 @@ void* partition(mNode* startNode, mNode* endNode, int (*comparator)(void*, void*
 int strcomp(void* string1, void* string2); //Use as comparator
 char* generatePath(char* projectName, char* pathToAppend);
 int searchMLL(mNode* serverManifest, mNode* clientManifest, int updateFilefd);
-void compareManifest(mNode* serverManifest, mNode* clientManifest, char* ProjectName);
+void compareManifest(mNode* serverManifest, mNode* clientManifest, char* ProjectName, char* serverVersion);
 int checkVersionAndHash(mNode* serverNode, mNode* clientNode, char* projectName, int updateFilefd, int conflictFilefd);
 void updateManifestVersion(char* projectName, int socketfd);
 void printFiles();
@@ -518,7 +518,7 @@ void update(char* ProjectName, int socketfd){
 	
 	do{
 		read = bufferFill(manifestfd, buffer, sizeof(buffer));
-		for(bufferPos = 0; bufferPos < (sizeof(buffer)/sizeof(buffer[0])); ++bufferPos){
+		for(bufferPos = 0; bufferPos < read; ++bufferPos){
 			if(buffer[bufferPos] == '\n'){ 
 				if(manifestVersion == 0){ //This is for version of the Manifest 
 					manifestVersion = 1; 
@@ -526,7 +526,6 @@ void update(char* ProjectName, int socketfd){
 						sameVersion = 1;
 						break;
 					}
-					free(serverVersion);
 					free(token);
 		     	}else{
 		     		curLine->hash = token;
@@ -568,6 +567,8 @@ void update(char* ProjectName, int socketfd){
 		remove(conflictFile);
 		free(updateFile);
 		free(conflictFile);
+		free(curLine);
+		free(token);
 		printf("Up To Date\n");
 		return;
 	}else{
@@ -582,13 +583,13 @@ void update(char* ProjectName, int socketfd){
 					read = bufferFill(socketfd, buffer, length);
 				}
 			}
-			for(bufferPos = 0; bufferPos < (sizeof(buffer)/sizeof(buffer[0])); ++bufferPos){
+			for(bufferPos = 0; bufferPos < read; ++bufferPos){
 				if(buffer[bufferPos] == '\n'){ 
 				  	curLine->hash = token;
 				  	serverHead = insertMLL(curLine, serverHead);
 				  	curLine = (mNode*) malloc(sizeof(mNode) * 1);
 				  	defaultSize = 15;
-		 			token = malloc(sizeof(char) * (defaultSize + 1));
+		 			token = (char*) malloc(sizeof(char) * (defaultSize + 1));
 					memset(token, '\0', sizeof(char) * (defaultSize + 1));
 					tokenpos = 0;
 				  	numOfSpaces = 0;
@@ -600,7 +601,7 @@ void update(char* ProjectName, int socketfd){
 				 		curLine->filepath = token;
 				 	}
 				 	defaultSize = 15;
-				 	token = malloc(sizeof(char) * (defaultSize + 1));
+				 	token = (char*) malloc(sizeof(char) * (defaultSize + 1));
 					memset(token, '\0', sizeof(char) * (defaultSize + 1));
 					tokenpos = 0;
 				}else{
@@ -615,6 +616,10 @@ void update(char* ProjectName, int socketfd){
 			length = length - read;
 		}while (buffer[0] != '\0' && read != 0 && length != 0);
 	}
+	printf("BEFORE: serverManifest:\n"); //DEBUGGING
+	printMLL(serverHead);
+	printf("BEFORE: clientManifest:\n");
+	printMLL(clientHead);
 	if(serverHead != NULL){
 		quickSort(serverHead, strcomp);
 	}
@@ -627,12 +632,82 @@ void update(char* ProjectName, int socketfd){
 	printMLL(clientHead);
 	free(curLine); //CHANGE TO mNode FREE METHOD | Actually should be good
 	free(token);
-	compareManifest(serverHead, clientHead, ProjectName);
+	compareManifest(serverHead, clientHead, ProjectName, serverVersion);
+	free(serverVersion);
 }
 /*
 	TO ADD, update the manifest entry for Append and Modify
 */
 void upgradeProcess(char* projectName, int upgradefd, int socketfd){
+	char* serverManifestfilepath = generatePath(projectName, "/serverManifestVersion");
+	int serverManifestfd = open(serverManifestfilepath, O_RDONLY);
+	char* serverManifestVersion = NULL;
+	free(serverManifestfilepath);
+	if(serverManifestfd == -1){
+		printf("Fatal Error: serverManifest Version could not be obtained to verify no changes have been since the last update\n");
+	}else{
+		int defaultSize = 10;
+	 	serverManifestVersion = malloc(sizeof(char) * defaultSize);
+	 	memset(serverManifestVersion, '\0', sizeof(char) * defaultSize);
+	 	int read = 0;
+	 	int tokenpos = 0;
+	 	char buffer[101] = {'\0'};
+	 	int bufferPos = 0;
+	 	do{
+	 		read = bufferFill(serverManifestfd, buffer, 100);
+			for(bufferPos = 0; bufferPos < read; ++bufferPos){
+				if(buffer[bufferPos] == '$'){
+					read = 0;
+					break;
+				}else{
+					if(tokenpos >= defaultSize){
+						defaultSize = defaultSize * 2;
+						serverManifestVersion = doubleStringSize(serverManifestVersion, defaultSize);
+					}
+					serverManifestVersion[tokenpos] = buffer[bufferPos];
+					tokenpos++;
+				}
+			}
+	 	}while(read != 0);
+	 	close(serverManifestfd);
+	}
+	printf("The client stored server version is: %s\n", serverManifestVersion );
+	writeToFile(socketfd, "upgrade$");
+	sendLength(socketfd, projectName);
+	
+	char* foundManifestVersion = NULL;
+	readNbytes(socketfd, strlen("FAILURE"), NULL, &foundManifestVersion);
+	if(strcmp(foundManifestVersion, "FAILURE") == 0){
+		printf("Fatal Error: Please call update again, the server's manifest for this project has changed since you last updated\n");
+		free(foundManifestVersion);
+		return;
+	}else{
+		printf("The server send back %s\n", foundManifestVersion);
+		free(foundManifestVersion);
+		foundManifestVersion = NULL;
+		int manifestversionlength = getLength(socketfd);
+		char* currentServerManifestVersion = NULL;
+		readNbytes(socketfd, manifestversionlength, NULL, &currentServerManifestVersion);
+		char* temp = malloc(sizeof(manifestversionlength) * sizeof(char));
+		memset(temp, '\0', manifestversionlength);
+		memcpy(temp, currentServerManifestVersion, manifestversionlength - 1);
+		free(currentServerManifestVersion);
+		printf("The server's current manifest version: %s\n", temp);
+		if(strcmp(temp, serverManifestVersion) == 0){
+			printf("Versions are correct, can continue with upgrade, no changes have been made to the server's manifest since last update\n");
+			free(temp);
+		}else{
+			printf("Fatal Error: Please call update again, the server's manifest for this project has changed since you last updated\n");
+			writeToFile(socketfd, "0$");
+			readNbytes(socketfd, strlen("FAILURE"), NULL, &foundManifestVersion);
+			if(strcmp(foundManifestVersion, "SUCCESS") == 0){
+				printf("Server Succesfully completed Upgrade\n");
+			}
+			free(temp);
+			return;
+		}
+	}
+
 	char buffer[100] = {'\0'};
 	int bufferPos = 0;
 	
@@ -722,14 +797,11 @@ void upgradeProcess(char* projectName, int upgradefd, int socketfd){
 	}while(buffer[0] != '\0' && read != 0);
 	free(curFile);
 	if(empty){
-		writeToFile(socketfd, "upgrade$");
-		writeToFile(socketfd, "0");
+		writeToFile(socketfd, "0$");
 		//READ SERVER RESPONSE IMPLEMENT
 		printf("Up To Date\n");
 	}else{
 		mNode* temp = mhead;
-		writeToFile(socketfd, "upgrade$");
-		sendLength(socketfd, projectName);
 		char str[5] = {'\0'};
 		sprintf(str, "%d", numberOfFiles);
 		writeToFile(socketfd, str);
@@ -1211,7 +1283,7 @@ void updateManifestVersion(char* projectName, int socketfd){
 	}
 }
 
-void compareManifest(mNode* serverManifest, mNode* clientManifest, char* ProjectName){
+void compareManifest(mNode* serverManifest, mNode* clientManifest, char* ProjectName, char* serverVersion){
 	char* updateFile = generatePath(ProjectName, "/Update"); //CHANGE TO ./Update for FINAL
 	char* conflictFile =  generatePath(ProjectName, "/Conflict"); //CHANGE TO ./Conflict for FINAL
 	printf("Updatepath: %s\n", updateFile);
@@ -1224,20 +1296,23 @@ void compareManifest(mNode* serverManifest, mNode* clientManifest, char* Project
 		return;
 	}
 	if(serverCurNode == NULL && clientCurNode == NULL){
-		printf("Warning: There were no entries in either Server's Manifest or Client's Manifest\n");
+		printf("Warning: There were no entries in either Server's Manifest or Client's Manifest, succesfully finish with update\n");
 		return;
 	}
 	int conflictFilefd = open(conflictFile, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
 	if(conflictFilefd == -1){
-		printf("Fatal Error: Could not create a new conflict file for upgrade\n");
+		printf("Fatal Error: Could not create a new conflict file for update\n");
 		return;
 	}
 	int conflict = 0;
+	int deletedFile = 0;
 	while(serverCurNode != NULL && clientCurNode != NULL){
 		if(strcmp(serverCurNode->filepath, clientCurNode->filepath) == 0){
 			int success = checkVersionAndHash(serverCurNode, clientCurNode, ProjectName, updateFilefd, conflictFilefd);
 			if(success == -1){
-				printf("Error: File did not exist or had no permissions to compute livehash, continuing to update regardless\n");
+				printf("Error: File did not exist or had no permissions to compute livehash, continuing to show updates but will not output the update file, please fix the file before calling update\n");
+				deletedFile = 1;
+				conflict = 1;
 			}else if(success == 2){
 				conflict = 1;
 			}
@@ -1278,8 +1353,19 @@ void compareManifest(mNode* serverManifest, mNode* clientManifest, char* Project
 	close(updateFilefd);
 	if(conflict == 0){
 		remove(conflictFile);
+		printf("Storing Server's Manifest Version for upgrade\n");
+		char* serverManifestVersionfilepath = generatePath(ProjectName, "/serverManifestVersion");
+		int serverManifestfilefd = open(serverManifestVersionfilepath, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+		free(serverManifestVersionfilepath);
+		writeToFile(serverManifestfilefd, serverVersion);
+		writeToFile(serverManifestfilefd, "$");
+		close(serverManifestfilefd);
 	}else{
-		printf("Warning: Project could not be updated: All the conflicts must be resolved before the project is updated\n");
+		if(deletedFile == 0){
+			printf("Warning: Project could not be updated: All the conflicts must be resolved before the project is updated\n");
+		}else{
+			remove(conflictFile);
+		}
 		remove(updateFile);
 	}
 	free(conflictFile);
