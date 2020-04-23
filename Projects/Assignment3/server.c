@@ -11,6 +11,7 @@
 #include <signal.h>
 #include <openssl/md5.h>
 #include <libgen.h>
+#include <arpa/inet.h>
 #include <pthread.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -62,6 +63,7 @@ void sendFile(int clientfd, char* fileName);
 void setupFileMetadata(int clientfd, fileNode* files, int numOfFiles);
 void sendFilesToClient(int clientfd, fileNode* files, int numOfFiles);
 void sendManifest(char* projectName, int clientfd);
+void sendFileBytes(char* filepath, int socketfd);
 /*
 	Helper Methods
 */
@@ -100,7 +102,6 @@ void insertCommit(char* clientid, char* projectName, char* commit, int clientfd)
 userNode* pthreadHead = NULL;
 fileNode* listOfFiles = NULL;
 commitNode* activeCommit = NULL;
-int assignedCommits = 0;
 int numOfFiles = 0;
 
 pthread_mutex_t lockRepo;
@@ -206,6 +207,7 @@ void* metadataParser(void* clientfdptr){
 				if(fileLength == 0){
 					writeToFile(clientfd, "SUCCESS");
 					printf("Successful upgrade, either the project's version did not match or the client is up to date to the server\n");
+					getManifestVersion(projectName, clientfd);
 				}else{ 
 					printf("Reading and sending %d files\n", fileLength);
 					upgrade(projectName, clientfd, fileLength);
@@ -467,16 +469,7 @@ void commit(char* projectName, int clientfd){
 
 void insertCommit(char* clientid, char* projectName, char* commit, int clientfd){
 	commitNode* newNode = malloc(sizeof(commitNode) * 1);
-	if(strcmp(clientid, "-1") == 0){
-		printf("New client detected and wants to do a commit, generating clientid for them\n");
-		free(clientid);
-		int length = snprintf(NULL, 0, "%d", assignedCommits);
-		clientid = (char*) malloc(sizeof(char) * length + 1);
-		memset(clientid, '\0', sizeof(char) * length + 1);
-		sprintf(clientid, "%d", assignedCommits);
-		printf("Assigning clientid: %d\n", assignedCommits);
-		assignedCommits = assignedCommits + 1;
-	}
+	printf("Clientid: %s", clientid);
 	
 	newNode->clientid = clientid;
 	newNode->commit = commit;
@@ -516,7 +509,6 @@ void insertCommit(char* clientid, char* projectName, char* commit, int clientfd)
 			newNode->prev = prevNode;
 		}
 	}
-	sendLength(clientfd, clientid);
 	writeToFile(clientfd, "SUCCESS");
 	printf("Successfully stored: %s\nbelongs to %s for %s\n", newNode->commit, newNode->clientid, newNode->pName);
 	printf("\n\n\nActive Commits:\n\n\n");
@@ -537,6 +529,16 @@ void freeCommitNode(commitNode* node){
 	free(node->commit);
 	free(node);
 }
+
+void sendFileBytes(char* filepath, int socketfd){
+	long long fileBytes = calculateFileBytes(filepath);
+	char filebytes[256] = {'\0'};
+	sprintf(filebytes, "%lld", fileBytes);
+	writeToFile(socketfd, filebytes);
+	writeToFile(socketfd, "$");
+	sendFile(socketfd, filepath);
+}
+
 
 void upgrade(char* projectName, int clientfd, int numOfFiles){
 	char buffer[2] = {'\0'}; 
