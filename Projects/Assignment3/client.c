@@ -740,14 +740,16 @@ void upgradeProcess(char* projectName, int upgradefd, int socketfd){
 		for(bufferPos = 0; bufferPos < sizeof(buffer); ++bufferPos){
 			if(buffer[bufferPos] == '\n'){
 				if(mode == 1){
-					modifyManifest(projectName, token, 0, NULL);
+					modifyManifest(projectName, curFile->filepath, 0, NULL);
+					free(curFile->filepath);
+					free(curFile);
 					free(token);
 				}else{
 					curFile->hash = token;
 					mhead = insertMLL(curFile, mhead);
 					numberOfFiles = numberOfFiles + 1;
-					curFile = (mNode*) malloc(sizeof(mNode) * 1);
 				}
+				curFile = (mNode*) malloc(sizeof(mNode) * 1);
 				mode = 0;
 				defaultSize = 25;
 				tokenpos = 0;
@@ -775,23 +777,23 @@ void upgradeProcess(char* projectName, int upgradefd, int socketfd){
 					token = malloc(sizeof(char) * (defaultSize + 1));
 					memset(token, '\0', sizeof(char) * (defaultSize + 1));
 				}else{
-					if(mode != 1){
-						curFile->filepath = token;
-						defaultSize = 15;
-						tokenpos = 0;
-						token = malloc(sizeof(char) * (defaultSize + 1));
-						memset(token, '\0', sizeof(char) * (defaultSize + 1));
-					}
+					
+					curFile->filepath = token;
+					defaultSize = 15;
+					tokenpos = 0;
+					token = malloc(sizeof(char) * (defaultSize + 1));
+					memset(token, '\0', sizeof(char) * (defaultSize + 1));
+					
 				}
 			}else{
-				if(mode != 1){
-					if(tokenpos >= defaultSize){
-						defaultSize = defaultSize * 2;
-						token = doubleStringSize(token, defaultSize);
-					}
-					token[tokenpos] = buffer[bufferPos];
-					tokenpos++;
+				
+				if(tokenpos >= defaultSize){
+					defaultSize = defaultSize * 2;
+					token = doubleStringSize(token, defaultSize);
 				}
+				token[tokenpos] = buffer[bufferPos];
+				tokenpos++;
+				
 			}		
 		}
 	}while(buffer[0] != '\0' && read != 0);
@@ -837,6 +839,7 @@ void upgradeProcess(char* projectName, int upgradefd, int socketfd){
 		readNbytes(socketfd, strlen("FAILURE"), NULL, &foundServerManifest);
 		if(strcmp(foundServerManifest, "SUCCESS") == 0){
 			int serverManifestLength = getLength(socketfd);
+			printf("The Manifest length is: %d\n", serverManifestLength);
 			readManifest(projectName, socketfd, serverManifestLength, &serverManifest);
 			printf("Printing Server Manifest\n");
 			printMLL(serverManifest);
@@ -911,6 +914,8 @@ int readManifest(char* projectName, int socketfd, int length, mNode** head){
 			if(sizeof(buffer) > length){
 				memset(buffer, '\0', sizeof(buffer));
 				read = bufferFill(socketfd, buffer, length);
+			}else{
+				read = bufferFill(socketfd, buffer, sizeof(buffer));
 			}
 			length = length - read;
 			control = read;
@@ -2089,20 +2094,36 @@ void* partition(mNode* startNode, mNode* endNode, int (*comparator)(void*, void*
     for(i = left; i != end->next; i = i->next){
         if(comparator(i, pivot) <= 0){
             beforeNULL = storeIndex;
-            char* holder = i->filepath;
+            char* fileholder = i->filepath;
+				char* filehash = i->hash;
+				char* fileversion = i->version;
             i->filepath = storeIndex->filepath;
-            storeIndex->filepath = holder;
+            i->hash = storeIndex->hash;
+            i->version = storeIndex->version;
+            storeIndex->filepath = fileholder;
+            storeIndex->hash = filehash;
+            storeIndex->version = fileversion;
             storeIndex = storeIndex->next;
         }
     }
-    char* holder = pivot->filepath;
+    char* fileholder = pivot->filepath;
+    char* filehash = pivot->hash;
+    char* fileversion = pivot->version;
     if(storeIndex == NULL){
         pivot->filepath = beforeNULL->filepath;
-        beforeNULL->filepath = holder;
+        pivot->hash = beforeNULL->hash;
+        pivot->version = beforeNULL->version;
+        beforeNULL->filepath = fileholder;
+        beforeNULL->hash = filehash;
+        beforeNULL->version = fileversion;
         return beforeNULL;
     }else{
         pivot->filepath = storeIndex->prev->filepath;
-        storeIndex->prev->filepath = holder;
+        pivot->hash = storeIndex->prev->hash;
+        pivot->version = storeIndex->prev->version;
+        storeIndex->prev->filepath = fileholder;
+        storeIndex->prev->hash = filehash;
+        storeIndex->prev->version = fileversion;
         return storeIndex->prev;
     }
     return NULL; //ERROR IF IT REACHES HERE

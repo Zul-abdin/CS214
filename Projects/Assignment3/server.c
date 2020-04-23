@@ -92,7 +92,7 @@ void getProjectVersion(char* directoryName, int clientfd);
 void createManifest(int fd, char* directorypath);
 void destroyProject(char* directoryName, int clientfd);
 void update(char* projectName, int clientfd);
-void upgrade(char* projectName, int clientfd);
+void upgrade(char* projectName, int clientfd, int numOfFiles);
 void commit(char* projectName, int clientfd);
 void insertCommit(char* clientid, char* projectName, char* commit, int clientfd);
 
@@ -207,10 +207,11 @@ void* metadataParser(void* clientfdptr){
 					writeToFile(clientfd, "SUCCESS");
 					printf("Successful upgrade, either the project's version did not match or the client is up to date to the server\n");
 				}else{ 
-					printf("Getting the project's files to update\n");
-					upgrade(projectName, clientfd);
+					printf("Reading and sending %d files\n", fileLength);
+					upgrade(projectName, clientfd, fileLength);
 				}
 				free(projectName);
+				printf("Finished Upgrade\n");
 				break;
 			}else if(strcmp(mode, "update") == 0){
 				printf("Getting the project to update\n");
@@ -537,7 +538,7 @@ void freeCommitNode(commitNode* node){
 	free(node);
 }
 
-void upgrade(char* projectName, int clientfd){
+void upgrade(char* projectName, int clientfd, int numOfFiles){
 	char buffer[2] = {'\0'}; 
 	int defaultSize = 15;
 	char* token = malloc(sizeof(char) * (defaultSize + 1));
@@ -551,24 +552,21 @@ void upgrade(char* projectName, int clientfd){
 	do{ 
 		read = bufferFill(clientfd, buffer, 1);
 		if(buffer[0] == '$'){
-			if(numOfFiles == 0){
-				numOfFiles = atoi(token);
-				free(token);
-			}else{
-				char* temp = NULL;
-				fileLength = atoi(token);
-				free(token);
-				readNbytes(clientfd, fileLength, NULL, &temp);
-				
-				char* name = (char*) malloc(sizeof(char) * strlen(basename(temp)) + 1);
-				memset(name, '\0', sizeof(char) * strlen(basename(temp)) + 1);
-				memcpy(name, basename(temp), strlen(basename(temp)));
 
-				fileNode* file = createFileNode(temp, name);
-				insertLL(file);
-				
-				filesRead++;
-			}
+			char* temp = NULL;
+			fileLength = atoi(token);
+			free(token);
+			readNbytes(clientfd, fileLength, NULL, &temp);
+			
+			char* name = (char*) malloc(sizeof(char) * strlen(basename(temp)) + 1);
+			memset(name, '\0', sizeof(char) * strlen(basename(temp)) + 1);
+			memcpy(name, basename(temp), strlen(basename(temp)));
+
+			fileNode* file = createFileNode(temp, name);
+			insertLL(file);
+			
+			filesRead++;
+			
 			if(numOfFiles == filesRead){
 				fileNode* temp = listOfFiles;
 				while(temp != NULL){
