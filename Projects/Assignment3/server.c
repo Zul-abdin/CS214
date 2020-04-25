@@ -869,23 +869,66 @@ int getCommit(char* commit, mNode** head){
 	return numberOfFiles;
 }
 
+
+
 int generateBackup(char* projectName){
 	char* historyfile = generateRollbackVersionfp(projectName);
 	printf("The rollback filepath is %s\n", historyfile);
 	char* projectPath = generatePath("", projectName);
 	printf("The project is %s\n", projectPath);
-	char* systemCall = (char*) malloc(sizeof(char) * (strlen(projectPath) + strlen(historyfile) + strlen("cp -ar ") + 2));
-	memset(systemCall, '\0', sizeof(char) * (strlen(projectPath) + strlen(historyfile) + strlen("cp -ar ") + 2));
-	strcat(systemCall, "cp -ar ");
-	strcat(systemCall, projectPath);
-	strcat(systemCall, " ");
-	strcat(systemCall, historyfile);
-	printf("The system call is %s", systemCall);
-	int historycreated = system(systemCall);
-	free(systemCall);
+	int errors = 0;
+	DIR* dirPath = opendir(projectPath);
+	struct dirent* curFile = readdir(dirPath);
+	while(curFile != NULL){
+		if(strcmp(curFile->d_name, ".") == 0 || strcmp(curFile->d_name, "..") == 0){
+			curFile = readdir(dirPath);
+			continue;
+		}
+		if(curFile->d_type == DT_REG){
+			printf("File Found: %s\n", curFile->d_name);
+			char* filepath = pathCreator(projectName, curFile->d_name);
+			printf("File path: %s\n", filepath);
+			char* systemCall = (char*) malloc(sizeof(char) * (strlen(filepath) + strlen(historyfile) + strlen("cp -ar ") + 2));
+			memset(systemCall, '\0', sizeof(char) * (strlen(filepath) + strlen(historyfile) + strlen("cp -ar ") + 2));
+			strcat(systemCall, "cp -ar ");
+			strcat(systemCall, filepath);
+			strcat(systemCall, " ");
+			strcat(systemCall, historyfile);
+			printf("The system call is %s\n", systemCall);
+			int historycreated = system(systemCall);
+			if(historycreated == -1){
+				errors = -1;
+			}
+			free(systemCall);
+			free(filepath);
+		}else if(curFile->d_type == DT_DIR){
+			printf("Directory Found: %s\n", curFile->d_name);
+			char* directorypath = pathCreator(projectName, curFile->d_name);
+			printf("Directory path: %s\n", directorypath);
+			if(strcmp(curFile->d_name, "rollback") != 0){ //CHANGE LATER
+				char* systemCall = (char*) malloc(sizeof(char) * (strlen(directorypath) + strlen(historyfile) + strlen("cp -ar ") + 2));
+				memset(systemCall, '\0', sizeof(char) * (strlen(directorypath) + strlen(historyfile) + strlen("cp -ar ") + 2));
+				strcat(systemCall, "cp -ar ");
+				strcat(systemCall, directorypath);
+				strcat(systemCall, " ");
+				strcat(systemCall, historyfile);
+				printf("The system call is %s\n", systemCall);
+				int historycreated = system(systemCall);
+				if(historycreated == -1){
+					errors = -1;
+				}
+				free(systemCall);
+			}
+			free(directorypath);
+		}else{
+			
+		}
+		curFile = readdir(dirPath);
+	}
+	closedir(dirPath);
 	free(projectPath);
 	free(historyfile);
-	return historycreated;
+	return errors;
 }
 
 char* generateRollbackVersionfp(char* projectName){
@@ -896,6 +939,7 @@ char* generateRollbackVersionfp(char* projectName){
 	strcat(historyVersion, currentVersion);
 	free(currentVersion);
 	char* historyFolder = generatePath(projectName, historyVersion);
+	makeDirectory(historyFolder);
 	free(historyVersion);
 	return historyFolder;
 }
