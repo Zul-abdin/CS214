@@ -162,6 +162,7 @@ int main(int argc, char** argv) {
     				}else{
     					printf("Error: Could not interpret the server's response\n");
     				}
+    				free(temp);
     				close(socketfd);
     			}else{
     			
@@ -278,6 +279,7 @@ int main(int argc, char** argv) {
 							}else{
 								printf("Error: Could not interpret the server's response %s\n", serverResponse);
 							}
+							free(serverResponse);
 			 				remove(commitFilepath);
 			 				close(socketfd);
 			 			}
@@ -593,26 +595,13 @@ void update(char* ProjectName, int socketfd){
 		printf("Fatal Error: Manifest does not exist or does not have permissions to be opened\n");
 		return;
 	}
-	char buffer[100] = {'\0'};
+   char buffer[100] = {'\0'};
    int defaultSize = 15;
-
-    
    int read = 0;
-   int tokenpos = 0;
-   int bufferPos = 0;
-   int numOfSpaces = 0;
-    
-   int manifestVersion = 0;
-   
+	int length = listOfFiles->filelength;
+	int tokenpos = 0;
    char* serverVersion = malloc(sizeof(char) * (defaultSize + 1));
    memset(serverVersion, '\0', sizeof(char) * (defaultSize + 1));
-   int length = listOfFiles->filelength;
-   int sameVersion = 0;
-   
-   mNode* serverHead = NULL;
-   mNode* clientHead = NULL;
-   mNode* curLine = malloc(sizeof(mNode) * 1);
-   
    do{
 		read = bufferFill(socketfd, buffer, 1);
 		length = length - read;
@@ -626,11 +615,19 @@ void update(char* ProjectName, int socketfd){
 		serverVersion[tokenpos] = buffer[0];
 		tokenpos++;
    }while(read != 0);
+   
+   
+   int numOfSpaces = 0;
+   mNode* clientHead = NULL;
+   int bufferPos = 0;
+   int manifestVersion = 0;
    defaultSize = 15;
 	tokenpos = 0;
 	char* token = malloc(sizeof(char) * (defaultSize + 1));
    memset(token, '\0', sizeof(char) * (defaultSize + 1));
+	mNode* curLine = malloc(sizeof(mNode) * 1);
 	
+	int sameVersion = 0;
 	do{
 		read = bufferFill(manifestfd, buffer, sizeof(buffer));
 		for(bufferPos = 0; bufferPos < read; ++bufferPos){
@@ -674,6 +671,8 @@ void update(char* ProjectName, int socketfd){
 	}while (buffer[0] != '\0' && read != 0 && sameVersion != 1);
 	defaultSize = 15;
 	tokenpos = 0;
+	close(manifestfd);
+	mNode* serverHead = NULL;
 	if(sameVersion == 1){
 		char* updateFile = generatePath(ProjectName, "/Update"); //CHANGE TO ./Update for FINAL
 		char* conflictFile =  generatePath(ProjectName, "/Conflict"); //CHANGE TO ./Conflict for FINAL
@@ -684,6 +683,8 @@ void update(char* ProjectName, int socketfd){
 		free(conflictFile);
 		free(curLine);
 		free(token);
+		free(serverVersion);
+		freeMLL(clientHead);
 		printf("Up To Date\n");
 		return;
 	}else{
@@ -749,7 +750,10 @@ void update(char* ProjectName, int socketfd){
 	free(token);
 	compareManifest(serverHead, clientHead, ProjectName, serverVersion);
 	free(serverVersion);
+	freeMLL(clientHead);
+	freeMLL(serverHead);
 }
+
 /*
 	TO ADD, update the manifest entry for Append and Modify
 */
@@ -823,8 +827,6 @@ void upgradeProcess(char* projectName, int upgradefd, int socketfd){
 	mNode* curFile = (mNode*) malloc(sizeof(mNode) * 1);
 	curFile->next = NULL;
 	curFile->prev = NULL;
-	char* filepath = NULL;
-	char* hash = NULL;
 	int numberOfFiles = 0;
 	//upgrade$BProjectName$ProjectNameNumOfFiles$BFile1$File1BFile2$
 	//SERVER SENDS: sendFile....THEN SUCCESS OR FAILURE THEN MANIFESTVERSION
@@ -903,7 +905,7 @@ void upgradeProcess(char* projectName, int upgradefd, int socketfd){
 		}else{
 			printf("Server has not succesfully finished upgrade, %s\n", serverResponse_);
 		}
-		
+		free(serverResponse_);
 		printf("Up To Date\n");
 	}else{
 		mNode* temp = mhead;
@@ -942,6 +944,7 @@ void upgradeProcess(char* projectName, int upgradefd, int socketfd){
 			}else{
 				printf("Server has not succesfully finished upgrade, %s\n", serverResponse_);
 			}
+			free(serverResponse_);
 		}
 		printf("Updating Local Manifest to the Server's Manifest\n");
 		updateManifestVersion(projectName, socketfd);
@@ -952,6 +955,7 @@ void upgradeProcess(char* projectName, int upgradefd, int socketfd){
 			char* foundServerManifest = NULL;
 			readNbytes(socketfd, strlen("FAILURE"), NULL, &foundServerManifest);
 			if(strcmp(foundServerManifest, "SUCCESS") == 0){
+				free(foundServerManifest);
 				int serverManifestLength = getLength(socketfd);
 				printf("The Manifest length is: %d\n", serverManifestLength);
 				readManifest(projectName, socketfd, serverManifestLength, &serverManifest);
@@ -974,11 +978,14 @@ void upgradeProcess(char* projectName, int upgradefd, int socketfd){
 						temp = temp->next;
 					}
 				}
+				freeMLL(serverManifest);
 			}else if(strcmp(foundServerManifest, "FAILURE") == 0){
+				free(foundServerManifest);
 				printf("Fatal Error: Server could not find the Manifest\n");
 			}
 		}
 	}
+	freeMLL(mhead);
 	free(token);
 	char* removeManifestVersion = generatePath(projectName, "/serverManifestVersion"); //CHANGE TO HIDDEN LATER
 	remove(removeManifestVersion);
@@ -1049,6 +1056,9 @@ int readManifest(char* projectName, int socketfd, int length, mNode** head){
 					free(token);
 				}
 				curEntry = (mNode*) malloc(sizeof(mNode) * 1);
+				curEntry->filepath = NULL;
+				curEntry->hash = NULL;
+				curEntry->version = NULL;
 				tokenpos = 0;
 				defaultSize = 25;
 				numOfSpaces = 0;
@@ -1128,8 +1138,8 @@ void freeMLL(mNode* head){
 	mNode* temp = head;
 	while(temp != NULL){
 		mNode* tobefreed = temp;
-		freeMNode(tobefreed);
 		temp = temp->next;
+		freeMNode(tobefreed);
 	}
 }
 
@@ -1137,6 +1147,7 @@ void freeMNode(mNode* node){
 	free(node->filepath);
 	free(node->version);
 	free(node->hash);
+	free(node);
 }
 
 void commitManifest(mNode* serverManifest, mNode* clientManifest, char* projectName, int socketfd){
@@ -1434,6 +1445,7 @@ void updateManifestVersion(char* projectName, int socketfd){
 	char* temp = NULL;
 	readNbytes(socketfd, strlen("FAILURE"), NULL, &temp);
 	if(strcmp(temp, "SUCCESS") == 0){
+		free(temp);
 		char buffer[2] = {'\0'};
 		int bufferPos = 0;
 		int defaultSize = 25;
@@ -1461,6 +1473,7 @@ void updateManifestVersion(char* projectName, int socketfd){
 		modifyManifest(projectName, NULL, 2, serverManifestVersion);
 		free(serverManifestVersion);
 	}else{
+		free(temp);
 		printf("Fatal Error: Server could not find the Manifest for this project\n");
 	}
 }
@@ -1670,6 +1683,7 @@ void pushCommit(char* projectName, int socketfd, char* commitfilepath){
 	char* commitFound = NULL;
 	readNbytes(socketfd, strlen("FAILURE"), NULL, &commitFound);
 	if(strcmp(commitFound, "SUCCESS") == 0){
+		free(commitFound);
 		printf("(DEBUG) Server successfully found your commit and expired all the other commits.\n");
 		commitFound = NULL;
 		readNbytes(socketfd, strlen("FAILURE"), NULL, &commitFound);
@@ -1687,11 +1701,13 @@ void pushCommit(char* projectName, int socketfd, char* commitfilepath){
 				sendFileBytes(curFile->filepath, socketfd);
 				curFile = curFile->next;
 			}
+			freeMLL(commitHeads);
 			printf("(DEBUG) Finished sending all the files to the server\n");
 			
 			free(commitFound);
 			readNbytes(socketfd, strlen("FAILURE"), NULL, &commitFound);
 			if(strcmp(commitFound, "SUCCESS") == 0){
+				free(commitFound);
 				printf("Server successfully updated everything and is sending the Manifest back\n");
 				
 				char* manifest = generateManifestPath(projectName);
@@ -1928,7 +1944,7 @@ Purpose: Reads data from the socket and writes to the files
 void writeToFileFromSocket(int socketfd, fileNode* files){
 	fileNode* file = files;
 	while(file != NULL){
-		char buffer[100] = {'\0'};
+		char buffer[101] = {'\0'};
 		int filelength = file->filelength;
 		int read = 0;
 		int filefd = open(file->filepath, O_WRONLY | O_CREAT | O_TRUNC,  S_IRUSR | S_IWUSR);
@@ -1936,8 +1952,8 @@ void writeToFileFromSocket(int socketfd, fileNode* files){
 			printf("Fatal Error: Could not write to File from the Socket because File did not exist or no permissions\n");
 		}
 		while(filelength != 0){
-			if(filelength > sizeof(buffer)){
-				read = bufferFill(socketfd, buffer, sizeof(buffer));
+			if(filelength > (sizeof(buffer) - 1)){
+				read = bufferFill(socketfd, buffer, (sizeof(buffer) - 1));
 			}else{
 				memset(buffer, '\0', sizeof(buffer));
 				read = bufferFill(socketfd, buffer, filelength);
@@ -1948,6 +1964,7 @@ void writeToFileFromSocket(int socketfd, fileNode* files){
 			filelength = filelength - read;
 		}
 		file = file->next;
+		close(filefd);
 	}
 }
 

@@ -53,6 +53,9 @@ void sighandler(int sig);
 void unloadMemory();
 void freeFileNodes();
 void freeCommitNode(commitNode* node);
+void freeMNode(mNode* node);
+void freeMLL(mNode* head);
+void freeCommitLL(commitNode* head);
 /*
 	Setup Server Methods
 */
@@ -449,7 +452,6 @@ void createProject(char* projectName, int clientfd){
 		int historyfd = open(historyfile, O_CREAT, S_IRUSR | S_IWUSR);
 		free(historyfile);
 		close(historyfd);
-		
 		printf("Sending the Manifest to Client\n");
 		writeToFile(clientfd, "SUCCESS");
 		printf("projectName: %s\n", projectName);
@@ -501,14 +503,14 @@ void destroyProject(char* directoryName, int clientfd){
 				if(temp->next != NULL){
 					temp->next->prev = temp->prev;
 				}
-				free(temp); //CHANGE TO FREE COMMIT NODE
+				freeCommitNode(temp); 
 			}else{
 				curNode = curNode->next;
 			}
 		}
 		writeToFile(clientfd, "SUCCESS");
 	}else{
-		printf("Server failed to destroy the project, sending error to client\n");
+		printf("Server failed to destroy the whole project, sending error to client\n");
 		writeToFile(clientfd, "FAILURE");
 	}
 }
@@ -523,6 +525,7 @@ void update(char* projectName, int clientfd){
 	}else{
 		printf("Project's Manifest found, sending to client\n");
 		writeToFile(clientfd, "SUCCESS");
+		close(fd);
 		sendManifest(projectName, clientfd);
 	}
 }
@@ -582,7 +585,7 @@ void push(char* projectName, int clientfd){
 				if(temp->next != NULL){
 					temp->next->prev = temp->prev;
 				}
-				free(temp); //CHANGE TO FREE COMMIT NODE
+				freeCommitNode(temp); //CHANGE TO FREE COMMIT NODE
 			}else{
 				curNode = curNode->next;
 			}
@@ -654,6 +657,7 @@ void push(char* projectName, int clientfd){
 			}
 			curFile = curFile->next;
 		}
+		freeMLL(listOfCommits);
 		printf("The server has fully updated all the file entries and files of the project\n");
 		char* newManifestVersion = convertIntToString(manifestversion + 1);
 		printf("The new manifest version is now: %s\n", newManifestVersion);
@@ -677,6 +681,7 @@ void push(char* projectName, int clientfd){
 		printf("Error: Server was not able to find the commit for this push, sending error to client\n");
 		writeToFile(clientfd, "FAILURE");
 	}
+	freeCommitNode(commitFound);
 	printf("PUSH IS FINISHED\n");
 }
 
@@ -806,7 +811,6 @@ int rollbackProject(char* projectPath, char* rollbackfolder){
 				errors = -1;
 			}
 			free(systemCall);
-		
 			free(directorypath);
 		}else{
 			
@@ -860,17 +864,17 @@ char* convertIntToString(int value){
 }
 
 void writeToFileFromSocket(int socketfd, int filelength, char* filepath){
-	char buffer[100] = {'\0'};
+	char buffer[101] = {'\0'};
 	int read = 0;
 	int filefd = open(filepath, O_WRONLY | O_CREAT | O_TRUNC,  S_IRUSR | S_IWUSR);
 	if(filefd == -1){
 		printf("Fatal Error: Could not write to File from the Socket because File did not exist or no permissions\n");
 	}
 	while(filelength != 0){
-		if(filelength > sizeof(buffer)){
-			read = bufferFill(socketfd, buffer, sizeof(buffer));
+		if(filelength > (sizeof(buffer) - 1)){
+			read = bufferFill(socketfd, buffer, (sizeof(buffer) - 1));
 		}else{
-			memset(buffer, '\0', sizeof(buffer));
+			memset(buffer, '\0', (sizeof(buffer) - 1));
 			read = bufferFill(socketfd, buffer, filelength);
 		}
 		printf("The buffer has %s\n", buffer);
@@ -878,6 +882,7 @@ void writeToFileFromSocket(int socketfd, int filelength, char* filepath){
 		filelength = filelength - read;
 	}
 	printf("Finished reading %s\n", filepath);
+	close(filefd);
 }
 
 /*
@@ -956,7 +961,7 @@ int getCommit(char* commit, mNode** head){
 			mode = 0;
 			numOfSpace = 0;
 			tokenpos = 0;
-			defaultSize = 25;
+			defaultSize = 15;
 			token = malloc(sizeof(char) * (defaultSize + 1));
 			memset(token, '\0', sizeof(char) * (defaultSize + 1));
 		}else if(commit[bufferPos] == ' '){
@@ -1088,6 +1093,7 @@ void commit(char* projectName, int clientfd){
 	}else{
 		printf("Project's Manifest found, sending to client\n");
 		writeToFile(clientfd, "SUCCESS");
+		close(fd);
 		sendManifest(projectName, clientfd);
 		char* sameVersion = NULL;
 		readNbytes(clientfd, strlen("FAILURE"), NULL, &sameVersion);
@@ -1096,6 +1102,7 @@ void commit(char* projectName, int clientfd){
 			sameVersion = NULL;
 			readNbytes(clientfd, strlen("FAILURE"), NULL, &sameVersion);
 			if(strcmp(sameVersion, "SUCCESS") == 0){
+				free(sameVersion);
 				printf("Client successfully completed commit and is sending the .commit file\n");
 				int tokenlength = getLength(clientfd);
 				char* clientid = NULL;
@@ -1109,17 +1116,21 @@ void commit(char* projectName, int clientfd){
 				insertCommit(clientid, commitProjectName, commitToken, clientfd);
 			}else if(strcmp(sameVersion, "FAILURE") == 0){
 				printf("Warning: Client did not successfully create commit, either the client could not create commit or client had an outdated version, succesfully completed commit\n");
+				free(sameVersion);
 			}else if(strcmp(sameVersion, "UPDATED") == 0){
 				printf("Warning: The Client and Server have no file entries in their Manifest or there were no new changes\n");
+				free(sameVersion);
 			}else{
 				printf("Error: Not sure what the Client send %s\n", sameVersion);
+				free(sameVersion);
 			}
 		}else if(strcmp(sameVersion, "FAILURE") == 0){
 			printf("Warning: The Client had a different manifest version than the server, successfully completed the commit\n");
+			free(sameVersion);
 		}else{
 			printf("Error: Not sure what the Client Sent %s\n", sameVersion);
+			free(sameVersion);
 		}
-		free(sameVersion);
 	}
 	printf("Finished commit\n");
 }
@@ -1177,6 +1188,14 @@ void printActiveCommits(){
 	while(curNode != NULL){
 		printf("Currently stored: %s\nbelongs to client%s for Project %s\n", curNode->commit, curNode->clientid, curNode->pName);
 		curNode = curNode->next;
+	}
+}
+
+void freeCommitLL(commitNode* head){
+	while(head != NULL){
+		commitNode* temp = head;
+		head = head->next;
+		freeCommitNode(temp);	
 	}
 }
 
@@ -1570,7 +1589,6 @@ int readManifest(char* projectName, int socketfd, int length, mNode** head){
 	int foundManifestVersion = 0;
 	mNode* curEntry = malloc(sizeof(mNode) * 1);
 	do{
-		int control = 0;
 		if(length != -1){
 			if(sizeof(buffer) > length){
 				memset(buffer, '\0', sizeof(buffer));
@@ -1579,12 +1597,10 @@ int readManifest(char* projectName, int socketfd, int length, mNode** head){
 				read = bufferFill(socketfd, buffer, sizeof(buffer));
 			}
 			length = length - read;
-			control = read;
 		}else{
 			read = bufferFill(socketfd, buffer, sizeof(buffer));
-			control = read;
 		}
-		for(bufferPos = 0; bufferPos < control; ++bufferPos){
+		for(bufferPos = 0; bufferPos < read; ++bufferPos){
 			if(buffer[bufferPos] == '\n'){
 				if(foundManifestVersion){
 					curEntry->hash = token;
@@ -1988,6 +2004,22 @@ int getLength(int socketfd){
 	return length;
 }
 
+void freeMLL(mNode* head){
+	mNode* temp = head;
+	while(temp != NULL){
+		mNode* tobefreed = temp;
+		temp = temp->next;
+		freeMNode(tobefreed);
+	}
+}
+
+void freeMNode(mNode* node){
+	free(node->filepath);
+	free(node->version);
+	free(node->hash);
+	free(node);
+}
+
 long long calculateFileBytes(char* fileName){
 	struct stat fileinfo;
 	bzero((char*)&fileinfo, sizeof(struct stat));
@@ -2096,6 +2128,7 @@ void unloadMemory(){
 		listOfFiles = listOfFiles->next;
 		free(temp);
 	}
+	freeCommitLL(activeCommit);
 	while(pthreadHead != NULL){
 		pthread_join(pthreadHead->thread, NULL);
 		userNode* temp = pthreadHead;
