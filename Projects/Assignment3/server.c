@@ -658,6 +658,7 @@ void push(char* projectName, int clientfd){
 			curFile = curFile->next;
 		}
 		freeMLL(listOfCommits);
+		freeMLL(manifestHead);
 		printf("The server has fully updated all the file entries and files of the project\n");
 		char* newManifestVersion = convertIntToString(manifestversion + 1);
 		printf("The new manifest version is now: %s\n", newManifestVersion);
@@ -1587,7 +1588,7 @@ int readManifest(char* projectName, int socketfd, int length, mNode** head){
 	int version = -1;
 	int numOfSpaces = 0;
 	int foundManifestVersion = 0;
-	mNode* curEntry = malloc(sizeof(mNode) * 1);
+	mNode* curEntry = NULL;
 	do{
 		if(length != -1){
 			if(sizeof(buffer) > length){
@@ -1605,12 +1606,15 @@ int readManifest(char* projectName, int socketfd, int length, mNode** head){
 				if(foundManifestVersion){
 					curEntry->hash = token;
 					(*head) = insertMLL(curEntry, (*head));
-					curEntry = (mNode*) malloc(sizeof(mNode) * 1);
 				}else{
 					foundManifestVersion = 1;
 					version = atoi(token);
 					free(token);
 				}
+				curEntry = (mNode*) malloc(sizeof(mNode) * 1);
+				curEntry->filepath = NULL;
+				curEntry->hash = NULL;
+				curEntry->version = NULL;
 				tokenpos = 0;
 				defaultSize = 25;
 				numOfSpaces = 0;
