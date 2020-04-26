@@ -108,6 +108,8 @@ char* generateRollbackVersionfp(char* projectName);
 mNode* insertMLL(mNode* newNode, mNode* head);
 void printMLL(mNode* head);
 void modifyManifest(char* projectName, char* filepath, int mode, char* replace);
+void removeGreaterVersions(char* projectName, int version);
+
 /*
 	Command Methods
 */
@@ -121,6 +123,8 @@ void commit(char* projectName, int clientfd);
 void insertCommit(char* clientid, char* projectName, char* commit, int clientfd);
 void push(char* projectName, int clientfd);
 void getHistory(int clientfd, char* projectName);
+int rollbackProject(char* projectPath, char* rollbackfolder);
+void rollbackVersion(int clientfd, char* projectName);
 
 userNode* pthreadHead = NULL;
 fileNode* listOfFiles = NULL;
@@ -202,6 +206,16 @@ void* metadataParser(void* clientfdptr){
 				mode = token;
 				printf("%s\n", mode);
 				pthread_mutex_lock(&lockRepo);
+			}else if(strcmp(mode, "rollback") == 0){
+				printf("Getting the project name to rollback\n");
+				fileLength = atoi(token);
+				free(token);
+				char* projectName = NULL;
+				readNbytes(clientfd, fileLength, NULL, &projectName);
+				rollbackVersion(clientfd, projectName);
+				
+				free(projectName);
+				break;
 			}else if(strcmp(mode, "history") == 0){
 				printf("Getting the Project name to retrieve the history\n");
 				fileLength = atoi(token);
@@ -367,6 +381,7 @@ void* metadataParser(void* clientfdptr){
 	if(mode != NULL){
 		free(mode);
 	}
+	close(clientfd);
 	freeFileNodes();
 	numOfFiles = 0;
 	pthread_mutex_unlock(&lockRepo);
@@ -681,6 +696,125 @@ void updateHistory(char* projectName, char* commit, int manifestVersion){
 		close(historyfd);
 	}	
 	printf("Succesfully inserted the commit into the history file\n");
+}
+
+void rollbackVersion(int clientfd, char* projectName){
+	char* project = generatePath("", projectName);
+	char* version = NULL;
+	int versionlength = getLength(clientfd);
+	readNbytes(clientfd, versionlength, NULL, &version);
+	if(directoryExist(project) == 0){
+		printf("Fatal Error: The Project does not exist for the rollback, sending error to client\n");
+		writeToFile(clientfd, "FAILURE");
+	}else{
+		printf("Server found the project to rollback, %s\n", project);
+		writeToFile(clientfd, "SUCCESS");
+		char* versionfilepath = malloc(sizeof(char) * (strlen(version) + strlen(project) + strlen("/rollback/") + 2)); //CHANGE LATER TO HIDDEN
+		memset(versionfilepath, '\0', sizeof(char) * (strlen(version) + strlen(project) + strlen("/rollback/") + 2));
+		strcat(versionfilepath, project);
+		strcat(versionfilepath, "/rollback/");
+		strcat(versionfilepath, version);
+		if(directoryExist(versionfilepath) == 1){
+			printf("Server found version rollback folder, %s\n", versionfilepath);
+			writeToFile(clientfd, "SUCCESS");
+			printf("Clearing the project folder except for rollback\n");
+			directoryTraverse(project, 4, -1);
+			printf("Performing rollback\n");
+			rollbackProject(project, versionfilepath);
+			printf("Finished Rollback, now deleting all directories above the version number\n");
+			removeGreaterVersions(projectName, atoi(version));
+			printf("Finished deleting all directories above the version number, sending success to client\n");
+			writeToFile(clientfd, "SUCCESS");
+		}else{
+			printf("Fatal Error: The version the client wants to rollback does not exist, sending client an error\n");
+			writeToFile(clientfd, "FAILURE");
+		}
+		free(versionfilepath);
+	}
+	free(project);
+	free(version);
+}
+
+void removeGreaterVersions(char* projectName, int version){
+	char* rollbackfp = generatePath(projectName, "/rollback");
+	DIR* dirPath = opendir(rollbackfp);
+	struct dirent* curFile = readdir(dirPath);
+	while(curFile != NULL){
+		if(strcmp(curFile->d_name, ".") == 0 || strcmp(curFile->d_name, "..") == 0){
+			curFile = readdir(dirPath);
+			continue;
+		}
+		if(curFile->d_type == DT_DIR){
+			printf("Directory Found: %s\n", curFile->d_name);
+			char* directorypath = pathCreator(rollbackfp, curFile->d_name);
+			printf("Directory path: %s\n", directorypath);
+			int foundVersion = atoi(curFile->d_name);
+			if(foundVersion > version){
+				directoryTraverse(directorypath, 3, -1);
+				remove(directorypath);
+			}
+			free(directorypath);
+		}
+		curFile = readdir(dirPath);
+	}
+	closedir(dirPath);
+	free(rollbackfp);
+}
+
+int rollbackProject(char* projectPath, char* rollbackfolder){
+	printf("The folder to insert is %s\n", projectPath);
+	printf("The rollback folder is %s\n", rollbackfolder);
+	int errors = 0;
+	DIR* dirPath = opendir(rollbackfolder);
+	struct dirent* curFile = readdir(dirPath);
+	while(curFile != NULL){
+		if(strcmp(curFile->d_name, ".") == 0 || strcmp(curFile->d_name, "..") == 0){
+			curFile = readdir(dirPath);
+			continue;
+		}
+		if(curFile->d_type == DT_REG){
+			printf("File Found: %s\n", curFile->d_name);
+			char* filepath = pathCreator(rollbackfolder, curFile->d_name);
+			printf("File path: %s\n", filepath);
+			char* systemCall = (char*) malloc(sizeof(char) * (strlen(filepath) + strlen(projectPath) + strlen("cp -ar ") + 2));
+			memset(systemCall, '\0', sizeof(char) * (strlen(filepath) + strlen(projectPath) + strlen("cp -ar ") + 2));
+			strcat(systemCall, "cp -ar ");
+			strcat(systemCall, filepath);
+			strcat(systemCall, " ");
+			strcat(systemCall, projectPath);
+			printf("The system call is %s\n", systemCall);
+			int historycreated = system(systemCall);
+			if(historycreated == -1){
+				errors = -1;
+			}
+			free(systemCall);
+			free(filepath);
+		}else if(curFile->d_type == DT_DIR){
+			printf("Directory Found: %s\n", curFile->d_name);
+			char* directorypath = pathCreator(rollbackfolder, curFile->d_name);
+			printf("Directory path: %s\n", directorypath);
+			
+			char* systemCall = (char*) malloc(sizeof(char) * (strlen(directorypath) + strlen(projectPath) + strlen("cp -ar ") + 2));
+			memset(systemCall, '\0', sizeof(char) * (strlen(directorypath) + strlen(projectPath) + strlen("cp -ar ") + 2));
+			strcat(systemCall, "cp -ar ");
+			strcat(systemCall, directorypath);
+			strcat(systemCall, " ");
+			strcat(systemCall, projectPath);
+			printf("The system call is %s\n", systemCall);
+			int historycreated = system(systemCall);
+			if(historycreated == -1){
+				errors = -1;
+			}
+			free(systemCall);
+		
+			free(directorypath);
+		}else{
+			
+		}
+		curFile = readdir(dirPath);
+	}
+	closedir(dirPath);
+	return errors;
 }
 
 int directoryExist(char* directoryPath){
@@ -1686,7 +1820,8 @@ void sendFile(int clientfd, char* filepath){
 Mode 0: Traverse through and add to manifest (the fd)
 Mode 1: Traverse through the directories and create fileNodes (to be implemented)
 Mode 2: Traverse through the directories and for each file, send to Client (Note* you should run MODE 1 to setup the Metadata of all these files) (to be implemented)
-Mode 3: Traverse through the directories and delete all directories
+Mode 3: Traverse through the directories and delete all directories and files
+Mode 4: Traverse through all the directories and delete all files and directories except for the "rollback" folder
 */
 int directoryTraverse(char* path, int mode, int fd){ 
 	DIR* dirPath = opendir(path);
@@ -1712,7 +1847,7 @@ int directoryTraverse(char* path, int mode, int fd){
 				free(hashcode);
 			}else if(mode == 1 && strcmp(curFile->d_name, "Manifest") != 0){
 				
-			}else if(mode == 3){
+			}else if(mode == 3 || mode == 4){
 				int success = remove(filepath);
 				if(success == -1){
 					printf("Error: File %s could not be deleted\n", filepath);
@@ -1724,6 +1859,14 @@ int directoryTraverse(char* path, int mode, int fd){
 			if(mode == 3){
 				directoryTraverse(directorypath, mode, fd);
 				remove(directorypath);
+			}else if(mode == 4){
+				if(strcmp(curFile->d_name, "rollback") != 0){ //CHANGE LATER
+					directoryTraverse(directorypath, mode, fd);
+					int success = remove(directorypath);
+					if(success == -1){
+						printf("Error: Directory %s could not be deleted\n", directorypath);
+					}
+				}
 			}else{
 				directoryTraverse(directorypath, mode, fd);
 			}

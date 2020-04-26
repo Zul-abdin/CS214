@@ -43,7 +43,8 @@ char** getConfig();
 	Cleanup Methods
 */
 void freeFileNodes();
-
+void freeMLL(mNode* head);
+void freeMNode(mNode* node);
 /*
 	Helper Methods
 */
@@ -249,6 +250,7 @@ int main(int argc, char** argv) {
 		 					}else{
 		 						printf("Error: Could not interpret the server's response\n");
 		 					}
+		 					free(temp);
 		 					close(socketfd);
 		 				}
     				}
@@ -409,7 +411,44 @@ int main(int argc, char** argv) {
     				modifyManifest(argv[2], argv[3], 0, NULL);
     			}
     		}else if(strlen(argv[1]) == 8 && strcmp(argv[1], "rollback") == 0){ //Rollback
-    		
+    			int socketfd = setupConnection();
+    			if(socketfd > 0){
+    				writeToFile(socketfd, "rollback$");
+    				sendLength(socketfd, argv[2]);
+    				sendLength(socketfd, argv[3]);
+    				char* serverResponse = NULL;
+					readNbytes(socketfd, strlen("FAILURE"), NULL, &serverResponse);
+					if(strcmp(serverResponse, "SUCCESS") == 0){
+						printf("Server succesfully located the project, server is now checking the version number\n");
+						free(serverResponse);
+						serverResponse = NULL;
+						readNbytes(socketfd, strlen("FAILURE"), NULL, &serverResponse);
+						if(strcmp(serverResponse, "SUCCESS") == 0){
+							char* temp = NULL;
+							readNbytes(socketfd, strlen("FAILURE"), NULL, &temp);
+							if(strcmp(temp, "SUCCESS") == 0){
+								printf("Server successfully rollbacked the project\n");
+							}else{
+								printf("Error: Could not interpret the server's response: %s\n", temp);
+							}
+							free(temp);
+						}else if(strcmp(serverResponse, "FAILURE") == 0){
+							printf("Fatal Error: Server could not locate the version\n");
+						}else{
+							printf("Error: Could not interpret the server's response: %s\n", serverResponse);
+						}
+						free(serverResponse);
+					}else if(strcmp(serverResponse, "FAILURE") == 0){
+						printf("Fatal Error: Server could not locate the project\n");
+						free(serverResponse);
+					}else{
+						printf("Error: Could not interpret the server's response: %s\n", serverResponse);
+						free(serverResponse);
+					}
+    				close(socketfd);
+    			}else{
+    			
+    			}
     		}else{
     			printf("Fatal Error: Invalid operation or Improperly Formatted\n");
     		}
@@ -986,9 +1025,8 @@ int readManifest(char* projectName, int socketfd, int length, mNode** head){
 	int version = -1;
 	int numOfSpaces = 0;
 	int foundManifestVersion = 0;
-	mNode* curEntry = malloc(sizeof(mNode) * 1);
+	mNode* curEntry = NULL;
 	do{
-		int control = 0;
 		if(length != -1){
 			if(sizeof(buffer) > length){
 				memset(buffer, '\0', sizeof(buffer));
@@ -997,22 +1035,20 @@ int readManifest(char* projectName, int socketfd, int length, mNode** head){
 				read = bufferFill(socketfd, buffer, sizeof(buffer));
 			}
 			length = length - read;
-			control = read;
 		}else{
 			read = bufferFill(socketfd, buffer, sizeof(buffer));
-			control = read;
 		}
-		for(bufferPos = 0; bufferPos < control; ++bufferPos){
+		for(bufferPos = 0; bufferPos < read; ++bufferPos){
 			if(buffer[bufferPos] == '\n'){
 				if(foundManifestVersion){
 					curEntry->hash = token;
 					(*head) = insertMLL(curEntry, (*head));
-					curEntry = (mNode*) malloc(sizeof(mNode) * 1);
 				}else{
 					foundManifestVersion = 1;
 					version = atoi(token);
 					free(token);
 				}
+				curEntry = (mNode*) malloc(sizeof(mNode) * 1);
 				tokenpos = 0;
 				defaultSize = 25;
 				numOfSpaces = 0;
@@ -1056,7 +1092,7 @@ void commit(char* projectName, int socketfd){
 		writeToFile(socketfd, "FAILURE");
 		printf("Error: Project's Manifest does not exist for commit\n");
 		free(manifest);
-		//FREE SERVERMANIFEST NODES LATER
+		freeMLL(serverManifest);
 		return;
 	}
 	int clientManifestVersion = readManifest(projectName, manifestfd, -1, &clientManifest);
@@ -1083,7 +1119,24 @@ void commit(char* projectName, int socketfd){
 		writeToFile(socketfd, "FAILURE");
 		printf("Fatal Error: Server and Client Manifest Versions are not the same, please update before calling commit\n");
 	}
-	//FREE THE serverMAnifest and ClientManifest
+	free(manifest);
+	freeMLL(clientManifest);
+	freeMLL(serverManifest);
+}
+
+void freeMLL(mNode* head){
+	mNode* temp = head;
+	while(temp != NULL){
+		mNode* tobefreed = temp;
+		freeMNode(tobefreed);
+		temp = temp->next;
+	}
+}
+
+void freeMNode(mNode* node){
+	free(node->filepath);
+	free(node->version);
+	free(node->hash);
 }
 
 void commitManifest(mNode* serverManifest, mNode* clientManifest, char* projectName, int socketfd){
@@ -1813,7 +1866,7 @@ mNode* insertMLL(mNode* newNode, mNode* head){
 	newNode->next = NULL;
 	newNode->prev = NULL;
 	if(head == NULL){
-	
+		
 	}else{
 		newNode->next = head;
 		head->prev = newNode;
