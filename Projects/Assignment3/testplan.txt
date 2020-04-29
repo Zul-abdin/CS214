@@ -1,119 +1,175 @@
-The following were also tested using the following file/directory types:
-a variety of file types, including .c, and .txt
-hidden files/directories
-empty files/directories
-Files containing all ascii characters
+(Assume client has already been configured, and server is running and sample.sample is any sample file in testfiles)
+All these files will be contained in a testfiles directory:
+    The following were also tested using the following file/directory types:
+    a variety of file types, including .c, and .txt
+    hidden files/directories
+    empty files/directories
+    Files containing all ascii characters
 
-The following were also tested using incorrect amount of arguments, and out-of-order operations.
+    The following were also tested using incorrect amount of arguments, and out-of-order operations.
 
-All Operations were tested for if the server stopped mid-run.
+    All Operations were tested for if the server stopped mid-run.
 
 Testing: create
 
-Code:
-./server 9123
-./client.out create <Project Name>
-
 Test Cases:
 Creating a project that is already in the server
+    ./client.out create <Project Name>
+    rm -rf <Project Name>
+    ./client.out create <Project Name>
+
 Creating a project that is already on the client
+    ./client.out create <Project Name>
+    rm -rf <Project Name>
+    ./client.out create <Project Name>
 
 Testing: destroy
 
-Code:
-./server 9123
-./client.out destroy <Project Name>
-
 Test Cases:
 Destroying a project that is in the client, but not still in the server
-Destroying a project in the server, but not yet upgraded in the client
-Destroying a project in the server, but not checked out or updated in the client
+    mkdir <Project Name>
+    ./client.out destroy <Project Name>
+
+Destroying a project in the server, but not checked out or updated in the client or Destroying a project in the server, but not yet upgraded in the client
+    ./client.out create <Project Name>
+    rm -rf <Project Name>
+    ./client.out destroy <Project Name>
+
 
 Testing: Add->Commit->Push
 
-Code:
-./server 9123
-./client.out add <Project Name> <Filepath>
-./client.out commit <Project Name>
-./client.out push <Project Name> <Filepath>
-
 Test Cases:
 committing without adding
+    ./client.out commit <Project Name>
+    ./client.out push <Project Name>
+
 pushing with no .Commit
+    ./client.out push <Project Name>
+
 Committing multiple files at a time
+    ./client.out add <Project Name> sample.sample
+    ./client.out add <Project Name> sample.sample
+    ./client.out commit <Project Name>
+    ./client.out push <Project Name>
+
 deleting file from client then re-creating it to commit
+    ./client.out add <Project Name> sample.sample
+    ./client.out commit <Project Name>
+    ./client.out push <Project Name>
+    rm -f <Project Name>/sample.sample
+    nano sample.sample
+    ./client.out add <Project Name> sample.sample
+    ./client.out commit <Project Name>
+    ./client.out push <Project Name>
+
+Deleting file after add
+    ./client.out add <Project Name> sample.sample
+    rm -f <Project Name>/sample.sample
+    ./client.out commit <Project Name>
+    ./client.out push <Project Name>
 
 Testing: update -> upgrade
 
-Code:
-./server 9123
-./client.out update <Project Name>
-./client.out upgrade <Project Name>
-
 Test Cases:
 Trying to upgrade before update or without a .Update
+    ./client.out upgrade <Project Name>
+
 Attempting to update something not on the server
+    ./client.out update <Project Name>
+    ./client.out upgrade <Project Name>
+
 Updating something already up to date
+    ./client.out update <Project Name>
+    ./client.out upgrade <Project Name>
+    ./client.out update <Project Name>
+    ./client.out upgrade <Project Name>
+
 Updating something more than one version behind
+    ./client.out add <Project Name> sample.sample
+    ./client.out commit <Project Name>
+    ./client.out push <Project Name>
+    ./client.out add <Project Name> sample.sample
+    ./client.out commit <Project Name>
+    ./client.out push <Project Name>
+    ./client.out rollback <Project Name> 0
+    ./client.out update <Project Name>
+    ./client.out upgrade <Project Name>
 
 Testing: remove
 
-Code:
-./server 9123
-./client.out add <Project Name> <Filepath>
-./client.out remove <Project Name>
-./client.out commit <Project Name>
-./client.out push <Project Name> <Filepath>
-
 Test Cases:
 trying to commit after adding, but then removing
+    ./client.out add <Project Name> sample.sample
+    ./client.out remove <Project Name>
+    ./client.out commit <Project Name>
+    ./client.out push <Project Name>
+
 Committing files after adding 2 files, but removing one of them
+    ./client.out add <Project Name> sample.sample
+    ./client.out add <Project Name> sample.sample
+    ./client.out remove <Project Name> sample.sample
+    ./client.out commit <Project Name>
+    ./client.out push <Project Name>
 
 Testing: Rollback
 
-Code:
-./server 9123
-./client.out add <Project Name> <Filepath>
-./client.out commit <Project Name>
-./client.out push <Project Name> <Filepath>
-./client.out rollback <Project Name> <Version>
-
 Test Cases:
 Doing rollback on a project that was never committed
+    ./client.out create <Project Name>
+    ./client.out rollback <Project Name> 0
+
 Doing rollback on an invalid version number
+    ./client.out create <Project Name>
+    ./client.out rollback <Project Name> 4
 
 Testing: History
 
-Code:
-./server 9123
-./client.out add <Project Name> <Filepath>
-./client.out commit <Project Name>
-./client.out push <Project Name> <Filepath>
-./client.out history <Project Name>
-
 Test Cases:
 Doing a rollback, and then checking history
+    ./client.out add <Project Name> <Filepath>
+    ./client.out commit <Project Name>
+    ./client.out push <Project Name> <Filepath>
+    ./client.out rollback 0
+    ./client.out history <Project Name>
+
 Checking history after adding a file, but not committing or pushing
+    ./client.out add <Project Name> <Filepath>
+    ./client.out history <Project Name>
 
 Testing: currentversion
 
-Code:
-./server 9123
-./client.out add <Project Name> <Filepath>
-./client.out commit <Project Name>
-./client.out push <Project Name> <Filepath>
-./client.out currentversion <Project Name>
-
 Test Cases:
 pushing updates a few times, then running currentversion
+    ./client.out add <Project Name> sample.sample
+    ./client.out commit <Project Name>
+    ./client.out push <Project Name>
+    ./client.out add <Project Name> sample.sample
+    ./client.out commit <Project Name>
+    ./client.out push <Project Name>
+    ./client.out add <Project Name> sample.sample
+    ./client.out commit <Project Name>
+    ./client.out push <Project Name>
+    ./client.out add <Project Name> sample.sample
+    ./client.out commit <Project Name>
+    ./client.out push <Project Name>
+    ./client.out currentversion <Project Name>
+
 Doing a rollback, and then checking currentversion
+    ./client.out add <Project Name> sample.sample
+    ./client.out commit <Project Name>
+    ./client.out push <Project Name>
+    ./client.out add <Project Name> sample.sample
+    ./client.out commit <Project Name>
+    ./client.out push <Project Name>
+    ./client.out rollback <Project Name> 1
+    ./client.out currentversion <Project Name>
 
 Testing: checkout
 
-Code:
-./server 9123
-./client.out checkout <Project Name>
-
 Test Cases:
 checking out a project already in the client
+    mkdir <Project Name>
+    ./client.out checkout <Project Name>
+
 Checking out a project not in the server
+    ./client.out checkout <Project Name>
