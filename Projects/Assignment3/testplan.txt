@@ -1,0 +1,119 @@
+The following were also tested using the following file/directory types:
+a variety of file types, including .c, and .txt
+hidden files/directories
+empty files/directories
+Files containing all ascii characters
+
+The following were also tested using incorrect amount of arguments, and out-of-order operations.
+
+All Operations were tested for if the server stopped mid-run.
+
+Testing: create
+
+Code:
+./server 9123
+./client.out create <Project Name>
+
+Test Cases:
+Creating a project that is already in the server
+Creating a project that is already on the client
+
+Testing: destroy
+
+Code:
+./server 9123
+./client.out destroy <Project Name>
+
+Test Cases:
+Destroying a project that is in the client, but not still in the server
+Destroying a project in the server, but not yet upgraded in the client
+Destroying a project in the server, but not checked out or updated in the client
+
+Testing: Add->Commit->Push
+
+Code:
+./server 9123
+./client.out add <Project Name> <Filepath>
+./client.out commit <Project Name>
+./client.out push <Project Name> <Filepath>
+
+Test Cases:
+committing without adding
+pushing with no .Commit
+Committing multiple files at a time
+deleting file from client then re-creating it to commit
+
+Testing: update -> upgrade
+
+Code:
+./server 9123
+./client.out update <Project Name>
+./client.out upgrade <Project Name>
+
+Test Cases:
+Trying to upgrade before update or without a .Update
+Attempting to update something not on the server
+Updating something already up to date
+Updating something more than one version behind
+
+Testing: remove
+
+Code:
+./server 9123
+./client.out add <Project Name> <Filepath>
+./client.out remove <Project Name>
+./client.out commit <Project Name>
+./client.out push <Project Name> <Filepath>
+
+Test Cases:
+trying to commit after adding, but then removing
+Committing files after adding 2 files, but removing one of them
+
+Testing: Rollback
+
+Code:
+./server 9123
+./client.out add <Project Name> <Filepath>
+./client.out commit <Project Name>
+./client.out push <Project Name> <Filepath>
+./client.out rollback <Project Name> <Version>
+
+Test Cases:
+Doing rollback on a project that was never committed
+Doing rollback on an invalid version number
+
+Testing: History
+
+Code:
+./server 9123
+./client.out add <Project Name> <Filepath>
+./client.out commit <Project Name>
+./client.out push <Project Name> <Filepath>
+./client.out history <Project Name>
+
+Test Cases:
+Doing a rollback, and then checking history
+Checking history after adding a file, but not committing or pushing
+
+Testing: currentversion
+
+Code:
+./server 9123
+./client.out add <Project Name> <Filepath>
+./client.out commit <Project Name>
+./client.out push <Project Name> <Filepath>
+./client.out currentversion <Project Name>
+
+Test Cases:
+pushing updates a few times, then running currentversion
+Doing a rollback, and then checking currentversion
+
+Testing: checkout
+
+Code:
+./server 9123
+./client.out checkout <Project Name>
+
+Test Cases:
+checking out a project already in the client
+Checking out a project not in the server
