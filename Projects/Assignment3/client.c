@@ -168,6 +168,10 @@ int main(int argc, char** argv) {
     			
     			}
     		}else if(strlen(argv[1]) == 7 && strcmp(argv[1], "upgrade") == 0){ //upgrade
+    			if(directoryExist(argv[2]) == 0){
+    				printf("Fatal Error: Project does not exist to upgrade\n");
+    				return 0;
+    			}
     			char* conflictFile = generatePath(argv[2], "/Conflict"); //Check later
 
     			int conflictFd = open(conflictFile, O_RDONLY);
@@ -212,7 +216,7 @@ int main(int argc, char** argv) {
     			}
     		}else if(strlen(argv[1]) == 6 && strcmp(argv[1], "commit") == 0){ //commit
     			if(directoryExist(argv[2]) == 0){
-    				printf("Fatal Error: Project does not exist to commit\n");
+    				printf("Fatal Error: Project does not exist for commit\n");
     				return 0;
     			}
     			char* conflictFile = generatePath(argv[2], "/Conflict"); //Check later
@@ -258,6 +262,10 @@ int main(int argc, char** argv) {
     				free(updateFile);		
     			}
     		}else if(strlen(argv[1]) == 4 && strcmp(argv[1], "push") == 0){ //push
+    		   if(directoryExist(argv[2]) == 0){
+    				printf("Fatal Error: Project does not exist for push\n");
+    				return 0;
+    			}
     			char* commitFilepath = generatePath(argv[2], "/commit"); //Check later
     			int commitfd = open(commitFilepath, O_RDONLY);
     			if(commitfd == -1){
@@ -287,6 +295,11 @@ int main(int argc, char** argv) {
     			}
     			free(commitFilepath);
     		}else if(strlen(argv[1]) == 6 && strcmp(argv[1], "create") == 0){ //create
+    			 if(directoryExist(argv[2]) == 1){
+    				printf("Fatal Error: Project already exist on client side, please remove before retrying\n");
+    				return 0;
+    			}
+    		
 				int socketfd = setupConnection();
 				if(socketfd > 0){
 					writeToFile(socketfd, "create$");
@@ -317,7 +330,7 @@ int main(int argc, char** argv) {
 					if(strcmp(temp, "SUCCESS") == 0){
 						printf("Server sucessfully destroyed the project\n");
 					}else if(strcmp(temp , "FAILURE") == 0){
-						printf("Fatal Error: Server failed to destroy the project\n");
+						printf("Fatal Error: Server failed to destroy the project, either project did not exist on server side or had no permissions to delete the project\n");
 					}else{
 						printf("Fatal Error: Could not interpret the server's response\n");
 					}
@@ -395,22 +408,39 @@ int main(int argc, char** argv) {
     			if(directoryExist(argv[2]) == 0){
     				printf("Fatal Error: Project does not exist to add the file\n");
     			}else{
-    				char* hashcode = generateHashCode(argv[3]);
+    				char* modifiedfilepath = NULL;
+    				modifiedfilepath = malloc(sizeof(char) * (strlen(argv[2]) + strlen(argv[3]) + 3));
+    				memset(modifiedfilepath, '\0', sizeof(char) * (strlen(argv[2]) + strlen(argv[3]) + 2));
+    				strcat(modifiedfilepath, argv[2]);
+    				strcat(modifiedfilepath, "/");
+    				strcat(modifiedfilepath, argv[3]);
+    				printf("Modified filepath: %s\n", modifiedfilepath);
+    				char* hashcode = generateHashCode(modifiedfilepath);
     				if(hashcode == NULL){
-    					
+    					printf("Fatal Error: File does not exist\n");
     				}else{
-		 				char* temp = createManifestLine("1", argv[3], hashcode, 1, 1); 
-		 				modifyManifest(argv[2], argv[3], 1, temp);    
+		 				char* temp = createManifestLine("0", modifiedfilepath, hashcode, 1, 1); 
+		 				modifyManifest(argv[2], modifiedfilepath, 1, temp);    
 		 				//appendToManifest(argv[2], temp);
 		 				free(hashcode);
 		 				free(temp);
     				}
+    				free(modifiedfilepath);
     			}
+    			
     		}else if(strlen(argv[1]) == 6 && strcmp(argv[1], "remove") == 0){ //Remove
     			if(directoryExist(argv[2]) == 0){
     				printf("Fatal Error: Project does not exist to remove the file\n");
     			}else{
-    				modifyManifest(argv[2], argv[3], 0, NULL);
+    				char* modifiedfilepath = NULL;
+    				modifiedfilepath = malloc(sizeof(char) * (strlen(argv[2]) + strlen(argv[3]) + 3));
+    				memset(modifiedfilepath, '\0', sizeof(char) * (strlen(argv[2]) + strlen(argv[3]) + 2));
+    				strcat(modifiedfilepath, argv[2]);
+    				strcat(modifiedfilepath, "/");
+    				strcat(modifiedfilepath, argv[3]);
+    				printf("Modified filepath: %s\n", modifiedfilepath);
+    				modifyManifest(argv[2], modifiedfilepath, 0, NULL);
+    				free(modifiedfilepath);
     			}
     		}else if(strlen(argv[1]) == 8 && strcmp(argv[1], "rollback") == 0){ //Rollback
     			int socketfd = setupConnection();
@@ -2272,10 +2302,10 @@ char* generateHashCode(char* filepath){
 			printf("%02x", (unsigned char) hash[i]);
 		}
 		printf("\n");
-		char* hexhash = (char *) malloc(sizeof(char) * ((strlen(hash) * 2) + 1));
-		memset(hexhash, '\0', sizeof(char) * ((strlen(hash) * 2) + 1));
+		char* hexhash = (char *) malloc(sizeof(char) * ((MD5_DIGEST_LENGTH * 2) + 1));
+		memset(hexhash, '\0', sizeof(char) * ((MD5_DIGEST_LENGTH * 2) + 1));
 		int previous = 0;
-		for(i = 0; i < strlen(hash); ++i){
+		for(i = 0; i < MD5_DIGEST_LENGTH; ++i){
 			sprintf( (char*) (hexhash + previous), "%02x", (unsigned char) hash[i]); //Each characters takes up 2 bytes now (hexadecimal value)
 			previous += 2;
 		}

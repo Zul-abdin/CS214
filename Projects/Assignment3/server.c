@@ -112,7 +112,7 @@ mNode* insertMLL(mNode* newNode, mNode* head);
 void printMLL(mNode* head);
 void modifyManifest(char* projectName, char* filepath, int mode, char* replace);
 void removeGreaterVersions(char* projectName, int version);
-
+void removeEmptyDirectory(char* path, char* projectName);
 /*
 	Command Methods
 */
@@ -629,6 +629,8 @@ void push(char* projectName, int clientfd){
 			if(strcmp(curFile->version, "D") == 0){
 				modifyManifest(projectName, curFile->filepath, 0, NULL);
 				remove(curFile->filepath);
+				char* directoryPath = dirname(curFile->filepath);
+				removeEmptyDirectory(directoryPath, projectName);
 			}else{
 				int filefd = open(curFile->filepath, O_RDONLY);
 				if(filefd == -1){
@@ -644,7 +646,7 @@ void push(char* projectName, int clientfd){
 				writeToFileFromSocket(clientfd, filelength, curFile->filepath); // updating the file content
 				char* replace = NULL;
 				if(strcmp(curFile->version, "A") == 0){
-					replace = createManifestLine("1", curFile->filepath, curFile->hash, 0, 0);
+					replace = createManifestLine("0", curFile->filepath, curFile->hash, 0, 0);
 				}else{
 					int version = getFileVersion(manifestHead, curFile->filepath);
 					version = version + 1;
@@ -672,7 +674,7 @@ void push(char* projectName, int clientfd){
 		free(manifestVersionLine);
 		printf("Succesfully updated the Manifest Version\n");
 		printf("Now updating the history file\n");
-		updateHistory(projectName, commitFound->commit, manifestversion);
+		updateHistory(projectName, commitFound->commit, (manifestversion + 1));
 		writeToFile(clientfd, "SUCCESS");
 		printf("Sending the updated manifest to client to replace\n");
 		manifest = generateManifestPath(projectName);
@@ -1075,7 +1077,7 @@ char* generateRollbackVersionfp(char* projectName){
 	char* currentVersion = getManifestVersionString(projectName);
 	char* historyVersion = malloc(sizeof(char) * (strlen(currentVersion) + 1 + 12));
 	memset(historyVersion, '\0', sizeof(char) * (strlen(currentVersion) + 1 + 12));
-	strcat(historyVersion, "/rollback/");
+	strcat(historyVersion, "/rollback/"); // CHANGE LATER
 	strcat(historyVersion, currentVersion);
 	free(currentVersion);
 	char* historyFolder = generatePath(projectName, historyVersion);
@@ -1430,7 +1432,7 @@ void modifyManifest(char* projectName, char* filepath, int mode, char* replace){
 
 
 void createManifest(int fd, char* directorypath){
-	writeToFile(fd, "1");
+	writeToFile(fd, "0");
 	writeToFile(fd, "\n");
 	directoryTraverse(directorypath, 0, fd);
 }
@@ -1924,10 +1926,10 @@ char* generateHashCode(char* filepath){
 			printf("%02x", (unsigned char) hash[i]);
 		}
 		printf("\n");
-		char* hexhash = (char *) malloc(sizeof(char) * ((strlen(hash) * 2) + 1));
-		memset(hexhash, '\0', sizeof(char) * ((strlen(hash) * 2) + 1));
+		char* hexhash = (char *) malloc(sizeof(char) * ((MD5_DIGEST_LENGTH * 2) + 1));
+		memset(hexhash, '\0', sizeof(char) * ((MD5_DIGEST_LENGTH * 2) + 1));
 		int previous = 0;
-		for(i = 0; i < strlen(hash); ++i){
+		for(i = 0; i < MD5_DIGEST_LENGTH; ++i){
 			sprintf( (char*) (hexhash + previous), "%02x", (unsigned char) hash[i]); //Each characters takes up 2 bytes now (hexadecimal value)
 			previous += 2;
 		}
@@ -2058,6 +2060,23 @@ void makeNestedDirectories(char* path){
 		makeNestedDirectories(parentdirectoryName);
 	}
 	mkdir(path, 0777);
+	free(directory);
+	free(parentdirectory);
+}
+
+void removeEmptyDirectory(char* path, char* projectName){
+	char* parentdirectory = strdup(path);
+	char* directory = strdup(path);
+	char* directoryName = basename(directory);
+	char* parentdirectoryName = dirname(parentdirectory);
+	printf("The directory path is %s\n", path);
+	if(strcmp(directoryName, projectName) != 0 && strcmp(path, ".") != 0 && strlen(path) != 0){
+		int success = remove(path);
+		if(success != -1){
+			printf("Succesfully removed: %s\n", path);
+			removeEmptyDirectory(parentdirectoryName, projectName);
+		}
+	}
 	free(directory);
 	free(parentdirectory);
 }
