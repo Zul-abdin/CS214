@@ -133,7 +133,7 @@ int main(int argc, char** argv) {
 						createDirectories(listOfFiles);
 						writeToFileFromSocket(socketfd, listOfFiles);
 					}else if(strcmp(temp, "FAILURE") == 0){
-						printf("Error: Server failed to locate the project, either project did not exist or had no permissions to access the project\n");
+						printf("Error: Server failed to locate the project\n");
 					}else{
 						printf("Error: Could not interpret the server's response\n");
 					}
@@ -2417,7 +2417,7 @@ int createSocket(){
 int connectToServer(int socketfd, char** serverinfo){
 	struct hostent* ip = gethostbyname(serverinfo[0]); //Not sure how to handle this, stuff isn't being freed here
 	if(ip == NULL){
-		printf("Fatal Error: Could not locate IP address\n");
+		printf("Fatal Error: IP address used in configure file does not work, invalid ip address\n");
 		return -1;
 	}
 	struct sockaddr_in serverinfostruct;
@@ -2427,7 +2427,7 @@ int connectToServer(int socketfd, char** serverinfo){
 	bcopy((char*)ip->h_addr, (char*)&serverinfostruct.sin_addr.s_addr, ip->h_length);
 	while(1){
 		if(connect(socketfd, (struct sockaddr*)&serverinfostruct, sizeof(serverinfostruct)) < 0){
-			printf("Error: Cannot connect to server, retrying\n");
+			printf("Warning: Cannot connect to server, retrying\n");
 			sleep(3);
 		}else{
 			printf("Successful Connection to Server\n");

@@ -136,6 +136,10 @@ Checking history after adding a file, but not committing or pushing
     ./client.out add <Project Name> <Filepath>
     ./client.out history <Project Name>
 
+Checking history after creating the project
+	./client.out create <Project Name>
+	./client.out history <Project Name>
+
 Testing: currentversion
 
 Test Cases:

@@ -1,0 +1,78 @@
+Testcase 0:
+	Input: 
+		./client create project1 project2
+	Output:
+		Fatal Error: Invalid operation or Improperly Formatted
+Testcase 1:
+	Input:
+		./client checkout 1 2 3
+	Output:
+		Fatal Error: Incorrect number of arguments.
+Testcase 2:
+	Input:
+		./client configure
+	Output:
+		Fatal Error: Incorrect number of arguments.
+Testcase 3:
+	Input:
+		./client add 1 2 
+	Output:
+		Fatal Error: Project does not exist to add the file
+Testcase 4:
+	Input: 
+		./client remove 1 2 
+	Output: 
+		Fatal Error: Project does not exist to remove the file
+Testcase 5:
+	Input: 
+		./client create project1
+	Output:
+		Fatal Error: IP address used in configure file does not work, invalid ip address
+Testcase 6:
+	Input:
+		./client update project1
+	Output:
+		Fatal Error: Configure file is missing or no permissions to Configure file, please call configure before running
+Testcase 6:
+	Input: 
+		./client create project1
+		./client history project1
+	Output: 
+		Warning: History file is empty, nothing to output
+Testcase 7:
+	Input:
+		./client create project1
+		./client currentversion project1
+	Output: 
+		Warning: There are no files in the Manifest
+Testcase 8:
+	Input:
+		./client create project1
+		./client add project1 file1.txt
+	Output: 
+		Fatal Error: File does not exist
+Testcase 9:
+	Input:
+		./client create project1
+		./client remove project1 file1.txt
+	Output:
+		Warning: The file is not listed in the Manifest to remove
+Testcase 10:
+	Input:
+		./client create project1 
+		touch project1/file1.txt
+		./project add project1 file1.txt
+	Output:
+		the project1's manifest should have manifest version 0 and have a new entry with l0 project1/file1.txt d41d8cd98f00b204e9800998ecf8427e
+Testcase 11:
+	Input:
+		./client create project1
+		./client create project1
+	Output:
+		Fatal Error: Project already exist on client side, please remove before retrying
+Testcase 12:
+	Input:
+		./client create project1
+			
+	Output: 
+	
