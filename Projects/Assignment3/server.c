@@ -46,9 +46,10 @@ typedef struct _manifestNodes_{
 	struct _manifestNodes_* prev;
 }mNode;
 
-/*
-	Clean up Methods
-*/
+//Setup Server Methods
+int setupServer(int socketfd, int port);
+
+//Clean up Methods
 void sighandler(int sig);
 void unloadMemory();
 void freeFileNodes();
@@ -56,69 +57,58 @@ void freeCommitNode(commitNode* node);
 void freeMNode(mNode* node);
 void freeMLL(mNode* head);
 void freeCommitLL(commitNode* head);
-/*
-	Setup Server Methods
-*/
-int setupServer(int socketfd, int port);
-/*
-	File Recieving Methods:
-*/
+
+//File Recieving Methods:
 void* metadataParser(void* clientfdptr);
 int bufferFill(int fd, char* buffer, int bytesToRead);
 void readNbytes(int fd, int length,char* mode ,char** placeholder);
+void writeToFileFromSocket(int socketfd, int filelength, char* filepath);
 
-/*
-	File Sending Methods:
-*/
+// File Sending Methods:
 void writeToFile(int fd, char* data);
 void sendFile(int clientfd, char* fileName);
 void setupFileMetadata(int clientfd, fileNode* files, int numOfFiles);
 void sendFilesToClient(int clientfd, fileNode* files, int numOfFiles);
 void sendManifest(char* projectName, int clientfd);
 void sendFileBytes(char* filepath, int socketfd);
-/*
-	Helper Methods
-*/
+void sendLength(int socketfd, char* token);
+
+// File Helper Methods
+long long calculateFileBytes(char* fileName);
+fileNode* createFileNode(char* filepath, char* filename);
+void printFiles();
+void insertLL(fileNode* node);
+int getLength(int socketfd);
+
+//Manifest Methods
+void createManifest(int fd, char* directorypath);
+void readManifestFiles(char* projectName, int mode, int clientfd);
+void modifyManifest(char* projectName, char* filepath, int mode, char* replace);
+char* createManifestLine(char* version, char* filepath, char* hashcode, int local, int mode);
+char* getManifestVersionString(char* projectName);
+char* generateManifestPath(char* projectName);
+void getManifestVersion(char* projectName, int clientfd);
+int getFileVersion(mNode* manifest, char* filepath);
+mNode* insertMLL(mNode* newNode, mNode* head);
+void printMLL(mNode* head);
+
+//General Helper Methods
 char* doubleStringSize(char* word, int newsize);
 char* pathCreator(char* path, char* name);
+char* generatePath(char* projectName, char* pathToAppend);
 int makeDirectory(char* directoryName);
 void makeNestedDirectories(char* path);
 int directoryTraverse(char* path, int mode, int fd);
 int directoryExist(char* directoryPath);
-long long calculateFileBytes(char* fileName);
-fileNode* createFileNode(char* filepath, char* filename);
-void readManifestFiles(char* projectName, int mode, int clientfd);
-char* createManifestLine(char* version, char* filepath, char* hashcode, int local, int mode);
-void appendToManifest(char* ProjectName, char* token);
-char* getManifestVersionString(char* projectName);
-char* generateManifestPath(char* projectName);
-void printFiles();
-void insertLL(fileNode* node);
 char* generateHashCode(char* filepath);
 void insertThreadLL(pthread_t node);
-void sendLength(int socketfd, char* token);
-void getManifestVersion(char* projectName, int clientfd);
-int getLength(int socketfd);
 void printActiveCommits();
-char* generatePath(char* projectName, char* pathToAppend);
-void updateHistory(char* projectName, char* commit, int manifestVersion);
-int getFileVersion(mNode* manifest, char* filepath);
 char* convertIntToString(int value);
-void writeToFileFromSocket(int socketfd, int filelength, char* filepath);
-int getCommit(char* commit, mNode** head);
-int generateBackup(char* projectName);
-char* generateRollbackVersionfp(char* projectName);
-mNode* insertMLL(mNode* newNode, mNode* head);
-void printMLL(mNode* head);
-void modifyManifest(char* projectName, char* filepath, int mode, char* replace);
-void removeGreaterVersions(char* projectName, int version);
 void removeEmptyDirectory(char* path, char* projectName);
-/*
-	Command Methods
-*/
+
+// Command Methods
 void createProject(char* directoryName, int clientfd);
 void getProjectVersion(char* directoryName, int clientfd);
-void createManifest(int fd, char* directorypath);
 void destroyProject(char* directoryName, int clientfd);
 void update(char* projectName, int clientfd);
 void upgrade(char* projectName, int clientfd, int numOfFiles);
@@ -127,7 +117,14 @@ void insertCommit(char* clientid, char* projectName, char* commit, int clientfd)
 void push(char* projectName, int clientfd);
 void getHistory(int clientfd, char* projectName);
 int rollbackProject(char* projectPath, char* rollbackfolder);
+
+// Command Helper Methods
+char* generateRollbackVersionfp(char* projectName);
+int generateBackup(char* projectName);
 void rollbackVersion(int clientfd, char* projectName);
+void updateHistory(char* projectName, char* commit, int manifestVersion);
+int getCommit(char* commit, mNode** head);
+void removeGreaterVersions(char* projectName, int version);
 
 userNode* pthreadHead = NULL;
 fileNode* listOfFiles = NULL;
@@ -186,7 +183,9 @@ void insertThreadLL(pthread_t node){
 	}
 	pthread_mutex_unlock(&pthreadLock);
 }
-
+/*
+	General metadata parser and the function the thread will run on
+*/
 void* metadataParser(void* clientfdptr){
 	int clientfd = *((int*) clientfdptr);
 	char buffer[1] = {'\0'}; 
@@ -267,8 +266,11 @@ void* metadataParser(void* clientfdptr){
 				fileLength = getLength(clientfd);
 				if(fileLength == 0){
 					writeToFile(clientfd, "SUCCESS");
-					printf("Successful upgrade, either the project's version did not match or the client is up to date to the server\n");
+					printf("Successful upgrade, the client is up to date to the server\n");
 					getManifestVersion(projectName, clientfd);
+				}else if(fileLength == -1){
+					writeToFile(clientfd, "SUCCESS");
+					printf("Successful upgrade, the client's update project version did not match the server\n");
 				}else{ 
 					printf("Reading and sending %d files\n", fileLength);
 					upgrade(projectName, clientfd, fileLength);
@@ -390,6 +392,7 @@ void* metadataParser(void* clientfdptr){
 	pthread_mutex_unlock(&lockRepo);
 	pthread_exit(NULL);
 }
+
 void printFiles(){
 	fileNode* temp = listOfFiles;
 	while(temp != NULL){
@@ -1212,19 +1215,13 @@ void upgrade(char* projectName, int clientfd, int numOfFiles){
 		}
 	}while(read != 0 && buffer[0] != '\0');
 	sendFilesToClient(clientfd, listOfFiles, numOfFiles);
-	getManifestVersion(projectName, clientfd);
 	char* manifest = generateManifestPath(projectName);
 	int manifestfd = open(manifest, O_RDONLY);
 	if(manifestfd != -1){
 		writeToFile(clientfd, "SUCCESS");
 		printf("Successfully Located the Project's Manifest for upgrade\n");
-		long long fileBytes = calculateFileBytes(manifest);
-		char filebytes[256] = {'\0'};
-		sprintf(filebytes, "%lld", fileBytes);
-		writeToFile(clientfd, filebytes);
-		writeToFile(clientfd, "$");
-		sendFile(clientfd, manifest);
 		close(manifestfd);
+		sendFileBytes(manifest, clientfd);
 	}else{
 		printf("Fatal Error: Failed to Locate the Project's Manifest for upgrade\n");
 		writeToFile(clientfd, "FAILURE");
@@ -1861,18 +1858,6 @@ char* generateHashCode(char* filepath){
 		close(filefd);
 		return hexhash;
 	}
-}
-
-
-void appendToManifest(char* ProjectName, char* token){
-	char* manifest = generateManifestPath(ProjectName);
-	int fd = open(manifest, O_WRONLY | O_APPEND);
-	if(fd == -1){
-		printf("Fatal Error: Manifest was not found the project file\n");
-		return;
-	}
-	writeToFile(fd, token);	
-	close(fd);
 }
 
 void writeToFile(int fd, char* data){
