@@ -530,7 +530,11 @@ void metadataParser(int clientfd){
 			}else if(strcmp(mode, "output") == 0){
 				int responseLength = atoi(token);
 				free(token);
-				readNbytes(clientfd, responseLength, NULL, NULL);
+				if(responseLength == 0){
+					printf("Warning: There are no files in the Manifest\n");
+				}else{
+					readNbytes(clientfd, responseLength, NULL, NULL);
+				}
 				break;
 			}else if(strcmp(mode, "sendFile") == 0){
 				if(numOfFiles == 0){

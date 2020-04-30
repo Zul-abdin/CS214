@@ -466,7 +466,7 @@ void getHistory(int clientfd, char* projectName){
 	int projectExist = directoryExist(projectName);
 	if(projectExist == 0){
 		writeToFile(clientfd, "FAILURE");
-		printf("Fatal Error: (SERVER) The Project was not found for push\n");
+		printf("Fatal Error: (SERVER) The Project was not found for history\n");
 		return;
 	}
 	char* historyfp = generatePath(projectName, "/history"); //CHANGE LATER
@@ -722,7 +722,9 @@ void rollbackVersion(int clientfd, char* projectName){
 		strcat(versionfilepath, project);
 		strcat(versionfilepath, "/rollback/");
 		strcat(versionfilepath, version);
-		if(directoryExist(versionfilepath) == 1){
+		int tarfd = open(versionfilepath, O_RDONLY);
+		if(tarfd != -1){
+			close(tarfd);
 			printf("Server found version rollback folder, %s\n", versionfilepath);
 			writeToFile(clientfd, "SUCCESS");
 			printf("Clearing the project folder except for rollback\n");
@@ -752,13 +754,12 @@ void removeGreaterVersions(char* projectName, int version){
 			curFile = readdir(dirPath);
 			continue;
 		}
-		if(curFile->d_type == DT_DIR){
-			printf("Directory Found: %s\n", curFile->d_name);
+		if(curFile->d_type == DT_REG){
+			printf("File Found: %s\n", curFile->d_name);
 			char* directorypath = pathCreator(rollbackfp, curFile->d_name);
-			printf("Directory path: %s\n", directorypath);
+			printf("File path: %s\n", directorypath);
 			int foundVersion = atoi(curFile->d_name);
 			if(foundVersion > version){
-				directoryTraverse(directorypath, 3, -1);
 				remove(directorypath);
 			}
 			free(directorypath);
@@ -772,56 +773,13 @@ void removeGreaterVersions(char* projectName, int version){
 int rollbackProject(char* projectPath, char* rollbackfolder){
 	printf("The folder to insert is %s\n", projectPath);
 	printf("The rollback folder is %s\n", rollbackfolder);
-	int errors = 0;
-	DIR* dirPath = opendir(rollbackfolder);
-	struct dirent* curFile = readdir(dirPath);
-	while(curFile != NULL){
-		if(strcmp(curFile->d_name, ".") == 0 || strcmp(curFile->d_name, "..") == 0){
-			curFile = readdir(dirPath);
-			continue;
-		}
-		if(curFile->d_type == DT_REG){
-			printf("File Found: %s\n", curFile->d_name);
-			char* filepath = pathCreator(rollbackfolder, curFile->d_name);
-			printf("File path: %s\n", filepath);
-			char* systemCall = (char*) malloc(sizeof(char) * (strlen(filepath) + strlen(projectPath) + strlen("cp -ar ") + 2));
-			memset(systemCall, '\0', sizeof(char) * (strlen(filepath) + strlen(projectPath) + strlen("cp -ar ") + 2));
-			strcat(systemCall, "cp -ar ");
-			strcat(systemCall, filepath);
-			strcat(systemCall, " ");
-			strcat(systemCall, projectPath);
-			printf("The system call is %s\n", systemCall);
-			int historycreated = system(systemCall);
-			if(historycreated == -1){
-				errors = -1;
-			}
-			free(systemCall);
-			free(filepath);
-		}else if(curFile->d_type == DT_DIR){
-			printf("Directory Found: %s\n", curFile->d_name);
-			char* directorypath = pathCreator(rollbackfolder, curFile->d_name);
-			printf("Directory path: %s\n", directorypath);
-			
-			char* systemCall = (char*) malloc(sizeof(char) * (strlen(directorypath) + strlen(projectPath) + strlen("cp -ar ") + 2));
-			memset(systemCall, '\0', sizeof(char) * (strlen(directorypath) + strlen(projectPath) + strlen("cp -ar ") + 2));
-			strcat(systemCall, "cp -ar ");
-			strcat(systemCall, directorypath);
-			strcat(systemCall, " ");
-			strcat(systemCall, projectPath);
-			printf("The system call is %s\n", systemCall);
-			int historycreated = system(systemCall);
-			if(historycreated == -1){
-				errors = -1;
-			}
-			free(systemCall);
-			free(directorypath);
-		}else{
-			
-		}
-		curFile = readdir(dirPath);
-	}
-	closedir(dirPath);
-	return errors;
+	char* systemCall = (char*) malloc(sizeof(char) * (strlen(rollbackfolder) + strlen("tar -xf ") + 1));
+	memset(systemCall, '\0', sizeof(char) * (strlen(rollbackfolder) + strlen("tar -xf ") + 1));
+	strcat(systemCall, "tar -xf ");
+	strcat(systemCall, rollbackfolder);
+	int success = system(systemCall);
+	free(systemCall);
+	return success;
 }
 
 int directoryExist(char* directoryPath){
@@ -1018,59 +976,24 @@ int generateBackup(char* projectName){
 	printf("The rollback filepath is %s\n", historyfile);
 	char* projectPath = generatePath("", projectName);
 	printf("The project is %s\n", projectPath);
-	int errors = 0;
-	DIR* dirPath = opendir(projectPath);
-	struct dirent* curFile = readdir(dirPath);
-	while(curFile != NULL){
-		if(strcmp(curFile->d_name, ".") == 0 || strcmp(curFile->d_name, "..") == 0){
-			curFile = readdir(dirPath);
-			continue;
-		}
-		if(curFile->d_type == DT_REG){
-			printf("File Found: %s\n", curFile->d_name);
-			char* filepath = pathCreator(projectName, curFile->d_name);
-			printf("File path: %s\n", filepath);
-			char* systemCall = (char*) malloc(sizeof(char) * (strlen(filepath) + strlen(historyfile) + strlen("cp -ar ") + 2));
-			memset(systemCall, '\0', sizeof(char) * (strlen(filepath) + strlen(historyfile) + strlen("cp -ar ") + 2));
-			strcat(systemCall, "cp -ar ");
-			strcat(systemCall, filepath);
-			strcat(systemCall, " ");
-			strcat(systemCall, historyfile);
-			printf("The system call is %s\n", systemCall);
-			int historycreated = system(systemCall);
-			if(historycreated == -1){
-				errors = -1;
-			}
-			free(systemCall);
-			free(filepath);
-		}else if(curFile->d_type == DT_DIR){
-			printf("Directory Found: %s\n", curFile->d_name);
-			char* directorypath = pathCreator(projectName, curFile->d_name);
-			printf("Directory path: %s\n", directorypath);
-			if(strcmp(curFile->d_name, "rollback") != 0){ //CHANGE LATER
-				char* systemCall = (char*) malloc(sizeof(char) * (strlen(directorypath) + strlen(historyfile) + strlen("cp -ar ") + 2));
-				memset(systemCall, '\0', sizeof(char) * (strlen(directorypath) + strlen(historyfile) + strlen("cp -ar ") + 2));
-				strcat(systemCall, "cp -ar ");
-				strcat(systemCall, directorypath);
-				strcat(systemCall, " ");
-				strcat(systemCall, historyfile);
-				printf("The system call is %s\n", systemCall);
-				int historycreated = system(systemCall);
-				if(historycreated == -1){
-					errors = -1;
-				}
-				free(systemCall);
-			}
-			free(directorypath);
-		}else{
-			
-		}
-		curFile = readdir(dirPath);
-	}
-	closedir(dirPath);
+	char* rollbackfolder = generatePath(projectName, "/rollback"); //Change later
+	printf("The rollback folder is: %d\n", rollbackfolder);
+	char* systemCall = (char*) malloc(sizeof(char) * (strlen(projectPath) + strlen(rollbackfolder) + strlen(historyfile) + strlen("tar -czf  ./ --exclude=''") + 3));
+	memset(systemCall, '\0', sizeof(char) * (strlen(projectPath) + strlen(rollbackfolder) + strlen(historyfile) + strlen("tar -czf  ./ --exclude=''") + 3));
+	strcat(systemCall, "tar -czf ");
+	strcat(systemCall, historyfile);
+	strcat(systemCall, " ");
+	strcat(systemCall, projectPath);
+	strcat(systemCall, " --exclude='");
+	strcat(systemCall, rollbackfolder);
+	strcat(systemCall, "'");
+	printf("The system call is %s\n", systemCall);
+	int success = system(systemCall);
+	free(systemCall);
 	free(projectPath);
+	free(rollbackfolder);
 	free(historyfile);
-	return errors;
+	return success;
 }
 
 char* generateRollbackVersionfp(char* projectName){
@@ -1081,7 +1004,6 @@ char* generateRollbackVersionfp(char* projectName){
 	strcat(historyVersion, currentVersion);
 	free(currentVersion);
 	char* historyFolder = generatePath(projectName, historyVersion);
-	makeDirectory(historyFolder);
 	free(historyVersion);
 	return historyFolder;
 }
@@ -1575,6 +1497,7 @@ void readManifestFiles(char* projectName, int mode, int clientfd){
         }
 		}while (buffer[0] != '\0' && read != 0);
 		free(token);
+		close(manifestfd);
 		printf("The List of files in project is:\n");
 	}
 }
@@ -1755,8 +1678,9 @@ void getProjectVersion(char* directoryName, int clientfd) {
         }
     }while (buffer[0] != '\0' && read != 0);
     if(token[0] == '\0'){
-    	printf("The project has no files\n");
+    	printf("Warning: The project has no files\n");
     }
+    close(fdManifest);
     printf("Sending the Client: %s\n", token);
     writeToFile(clientfd, "output$");
 	 char str[3] = {'\0'};
@@ -1948,6 +1872,7 @@ void appendToManifest(char* ProjectName, char* token){
 		return;
 	}
 	writeToFile(fd, token);	
+	close(fd);
 }
 
 void writeToFile(int fd, char* data){
