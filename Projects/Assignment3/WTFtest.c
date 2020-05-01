@@ -19,8 +19,8 @@ void checkResult(char* resultpath, char* result, char* testcase);
 void generateResult(char* command);
 
 int main(int argc, char** argv) {
-	char* serverpath = "./serverFolder/server";
-	char* clientpath = "./clientFolder/client";
+	char* serverpath = "./serverFolder/WTFserver";
+	char* clientpath = "./clientFolder/WTF";
 	int serverfd = open(serverpath, O_RDONLY);
 	if(serverfd == -1){
 		printf("The server folder has not been created, please run \"make test\" ");
@@ -35,22 +35,22 @@ int main(int argc, char** argv) {
 	close(clientfd);
 	
 	char* resultpath = "result.txt";;
-	generateResult("./clientFolder/client create project1 2 > result.txt");
+	generateResult("./clientFolder/WTF create project1 2 > result.txt");
 	checkResult(resultpath, "Fatal Error: Invalid operation or Improperly Formatted", "Testcase 0");
 	
-	generateResult("./clientFolder/client update 1 2 3 4 > result.txt");
+	generateResult("./clientFolder/WTF update 1 2 3 4 > result.txt");
 	checkResult(resultpath, "Fatal Error: Incorrect number of arguments.", "Testcase 1");
 	
-	generateResult("./clientFolder/client configure > result.txt");
+	generateResult("./clientFolder/WTF configure > result.txt");
 	checkResult(resultpath, "Fatal Error: Incorrect number of arguments.", "Testcase 2");
 	
-	generateResult("./clientFolder/client add 1 2 > result.txt");
+	generateResult("./clientFolder/WTF add 1 2 > result.txt");
 	checkResult(resultpath, "Fatal Error: Project does not exist to add the file", "Testcase 3");
 	
-	generateResult("./clientFolder/client remove 1 2 > result.txt");
+	generateResult("./clientFolder/WTF remove 1 2 > result.txt");
 	checkResult(resultpath, "Fatal Error: Project does not exist to remove the file", "Testcase 4");
 
-	generateResult("./clientFolder/client create project1 > result.txt");
+	generateResult("./clientFolder/WTF create project1 > result.txt");
 	checkResult(resultpath, "Fatal Error: Configure file is missing or no permissions to Configure file, please call configure before running", "Testcase 5");
 	
 	printf("Forking to create the server and client\n");
@@ -59,11 +59,11 @@ int main(int argc, char** argv) {
 	if(childpid == 0){
 		chdir("./serverFolder");
 		printf("The directory has changed to server's folder\n");
-		char* argv_list[] = {"./server", "9123", NULL};
-		execv("./server", argv_list);
+		char* argv_list[] = {"./WTFserver", "9123", NULL};
+		execv("./WTFserver", argv_list);
 		//generateResult("./serverFolder/server 9123");
 	}else if(childpid > 0){
-		generateResult("cd ./clientFolder; ./client configure localhost 9123; ./client create project1; ./client history project1 > result.txt");
+		generateResult("cd ./clientFolder; ./WTF configure localhost 9123; ./WTF create project1; ./WTF history project1 > result.txt");
 		char* clientpath = "./clientFolder/result.txt";
 		checkResult(clientpath, "Successful Connection to Server\nWarning: History file is empty, nothing to output\nClient: Terminated Server Connection\n", "Testcase 6");
 		kill(childpid, SIGKILL);

@@ -1,430 +1,430 @@
 Testcase 0:
 	Code: 
-		./client create project1 2
+		./WTF create project1 2
 Testcase 1:
 	Code:
-		./client update 1 2 3 4
+		./WTF update 1 2 3 4
 
 Testcase 2: 
 	Code:
-		./client configure
+		./WTF configure
 		
 Testcase 3:
 	Code: 
-		./client add 1 2
+		./WTF add 1 2
 
 Testcase 4:
 	Code:
-		./client remove 1 2
+		./WTF remove 1 2
 
 Testcase 5:
 	Code:
-		./client create project1
+		./WTF create project1
 
 Testcase 6:
 	Code:
-	Client:
-		./client configure localhost 9123
-		./client create project1
-		./client history project1
-	Server:
-		./server 9123
+	WTF:
+		./WTF configure localhost 9123
+		./WTF create project1
+		./WTF history project1
+	WTFserver:
+		./WTFserver 9123
 
 Testcase 7:
 	Code:
-	Client:
-		./client configure localhost 9123
-		./client create project1
-		./client currentversion project1
-	Server:
-		./server 9123
+	WTF:
+		./WTF configure localhost 9123
+		./WTF create project1
+		./WTF currentversion project1
+	WTFserver:
+		./WTFserver 9123
 		
 Testcase 8:
 	Code:
-	Client:
-		./client configure localhost 9123
-		./client create project1
-		./client add project1 file1.txt
-	Server:
-		./server 9123
+	WTF:
+		./WTF configure localhost 9123
+		./WTF create project1
+		./WTF add project1 file1.txt
+	WTFserver:
+		./WTFserver 9123
 		
 Testcase 9:
 	Code:
-	Client:
-		./client configure localhost 9123
-		./client create project1
-		./client remove project1 file1.txt
-	Server:
-		./server 9123	
+	WTF:
+		./WTF configure localhost 9123
+		./WTF create project1
+		./WTF remove project1 file1.txt
+	WTFserver:
+		./WTFserver 9123	
 		
 Testcase 10:
 	Code:
-	Client:
-		./client configure localhost 9123
-		./client create project1
+	WTF:
+		./WTF configure localhost 9123
+		./WTF create project1
 		touch project1/file1.txt
-		./client add project1 file1.txt
-	Server:
-		./server 9123
+		./WTF add project1 file1.txt
+	WTFserver:
+		./WTFserver 9123
 		
 Testcase 11:
 	Code:
-	Client:
-		./client configure localhost 9123
-		./client create project1
-		./client create project1
-	Server:
-		./server 9123	
+	WTF:
+		./WTF configure localhost 9123
+		./WTF create project1
+		./WTF create project1
+	WTFserver:
+		./WTFserver 9123	
 	
 Testcase 12:
 	Code:
-	Client:
-		./client configure localhost 9123
-		./client create project1
+	WTF:
+		./WTF configure localhost 9123
+		./WTF create project1
 		touch project1/file1.txt
-		./client add project1 file1.txt
-		./client add project1 file1.txt
-	Server:
-		./server 9123
+		./WTF add project1 file1.txt
+		./WTF add project1 file1.txt
+	WTFserver:
+		./WTFserver 9123
 		
 Testcase 13:
 	Code:
-	Client:
-		./client configure localhost 9123
-		./client create project1
+	WTF:
+		./WTF configure localhost 9123
+		./WTF create project1
 		echo testinput > project1/file1.txt
-		./client add project1 file1.txt
-		./client commit project1
-	Server:
-		./server 9123
+		./WTF add project1 file1.txt
+		./WTF commit project1
+	WTFserver:
+		./WTFserver 9123
 
 Testcase 14:
 	Code:
-	Client:
-		./client configure localhost 9123
-		./client create project1
+	WTF:
+		./WTF configure localhost 9123
+		./WTF create project1
 		echo testinput > project1/file1.txt
-		./client add project1 file1.txt
-		./client commit project1
-		./client push project1
-	Server:
-		./server 9123
+		./WTF add project1 file1.txt
+		./WTF commit project1
+		./WTF push project1
+	WTFserver:
+		./WTFserver 9123
 				
 Testcase 15:
 	Code:
-	Client:
-		./client configure localhost 9123
-		./client create project1
+	WTF:
+		./WTF configure localhost 9123
+		./WTF create project1
 		echo testinput > project1/file1.txt
-		./client add project1 file1.txt
-		./client commit project1
-		./client push project1
+		./WTF add project1 file1.txt
+		./WTF commit project1
+		./WTF push project1
 		echo testInputModified > project1/file1.txt
-		./client commit project1
-		./client push project1
-	Server:
-		./server 9123
+		./WTF commit project1
+		./WTF push project1
+	WTFserver:
+		./WTFserver 9123
 		
 Testcase 16:
 	Code:
-	Client:
-		./client configure localhost 9123
-		./client create project1
+	WTF:
+		./WTF configure localhost 9123
+		./WTF create project1
 		echo testinput > project1/file1.txt
-		./client add project1 file1.txt
-		./client commit project1
-		./client push project1
-		./client remove project1 file1.txt
-		./client commit project1
-		./client push project1
-	Server:
-		./server 9123		
+		./WTF add project1 file1.txt
+		./WTF commit project1
+		./WTF push project1
+		./WTF remove project1 file1.txt
+		./WTF commit project1
+		./WTF push project1
+	WTFserver:
+		./WTFserver 9123		
 		
 Testcase 17:
 	Code:
-	Client:
-		./client configure localhost 9123
-		./client create project1
+	WTF:
+		./WTF configure localhost 9123
+		./WTF create project1
 		echo testinput > project1/file1.txt
-		./client add project1 file1.txt
-		./client commit project1
-		./client push project1
-		./client history project1
-	Server:
-		./server 9123
+		./WTF add project1 file1.txt
+		./WTF commit project1
+		./WTF push project1
+		./WTF history project1
+	WTFserver:
+		./WTFserver 9123
 
 Testcase 18:
 	Code:
-	Client:
-		./client configure localhost 9123
-		./client create project1
+	WTF:
+		./WTF configure localhost 9123
+		./WTF create project1
 		echo testinput > project1/file1.txt
-		./client add project1 file1.txt
-		./client commit project1
-		./client push project1
-		./client currentversion project1
-	Server:
-		./server 9123
+		./WTF add project1 file1.txt
+		./WTF commit project1
+		./WTF push project1
+		./WTF currentversion project1
+	WTFserver:
+		./WTFserver 9123
 
 Testcase 19:
 	Code:
-	Client:
-		./client configure localhost 9123
-		./client create project1
+	WTF:
+		./WTF configure localhost 9123
+		./WTF create project1
 		echo testinput > project1/file1.txt
 		echo testinput2 > project1/file2.txt
 		echo testinput3 > project1/file3.txt
 		echo testinput4 > project1/file4.txt
-		./client add project1 file1.txt
-		./client add project1 file2.txt
-		./client add project1 file3.txt
-		./client add project1 file4.txt
-		./client commit project1
-		./client push project1
-	Server:
-		./server 9123
+		./WTF add project1 file1.txt
+		./WTF add project1 file2.txt
+		./WTF add project1 file3.txt
+		./WTF add project1 file4.txt
+		./WTF commit project1
+		./WTF push project1
+	WTFserver:
+		./WTFserver 9123
 
 Testcase 20:
 	Code:
-	Client:
-		./client configure localhost 9123
-		./client create project1
+	WTF:
+		./WTF configure localhost 9123
+		./WTF create project1
 		echo testinput > project1/file1.txt
 		echo testinput2 > project1/file2.txt
 		echo testinput3 > project1/file3.txt
 		echo testinput4 > project1/file4.txt
-		./client add project1 file1.txt
-		./client add project1 file2.txt
-		./client add project1 file3.txt
-		./client add project1 file4.txt
-		./client commit project1
-		./client push project1
-		./client rollback project1 0
-	Server:
-		./server 9123
+		./WTF add project1 file1.txt
+		./WTF add project1 file2.txt
+		./WTF add project1 file3.txt
+		./WTF add project1 file4.txt
+		./WTF commit project1
+		./WTF push project1
+		./WTF rollback project1 0
+	WTFserver:
+		./WTFserver 9123
 
 Testcase 21:
 	Code:
-	Client:
-		./client configure localhost 9123
-		./client create project1
+	WTF:
+		./WTF configure localhost 9123
+		./WTF create project1
 		echo testinput > project1/file1.txt
 		echo testinput2 > project1/file2.txt
 		echo testinput3 > project1/file3.txt
 		echo testinput4 > project1/file4.txt
-		./client add project1 file1.txt
-		./client add project1 file2.txt
-		./client add project1 file3.txt
-		./client add project1 file4.txt
-		./client commit project1
-		./client push project1
-		./client rollback project1 0
-		./client update
-		./client upgrade
-	Server:
-		./server 9123
+		./WTF add project1 file1.txt
+		./WTF add project1 file2.txt
+		./WTF add project1 file3.txt
+		./WTF add project1 file4.txt
+		./WTF commit project1
+		./WTF push project1
+		./WTF rollback project1 0
+		./WTF update
+		./WTF upgrade
+	WTFserver:
+		./WTFserver 9123
 
 Testcase 22:
 	Code:
-	Client:
-		./client configure localhost 9123
-		./client create project1
+	WTF:
+		./WTF configure localhost 9123
+		./WTF create project1
 		echo testinput > project1/file1.txt
 		echo testinput2 > project1/file2.txt
 		echo testinput3 > project1/file3.txt
 		echo testinput4 > project1/file4.txt
-		./client add project1 file1.txt
-		./client add project1 file2.txt
-		./client add project1 file3.txt
-		./client add project1 file4.txt
-		./client commit project1
-		./client push project1
+		./WTF add project1 file1.txt
+		./WTF add project1 file2.txt
+		./WTF add project1 file3.txt
+		./WTF add project1 file4.txt
+		./WTF commit project1
+		./WTF push project1
 		rm -rf project1
-		./client checkout project1
-	Server:
-		./server 9123
+		./WTF checkout project1
+	WTFserver:
+		./WTFserver 9123
 		
 Testcase 23:
 	Code:
-	Client:
-		./client configure localhost 9123
-		./client create project1
+	WTF:
+		./WTF configure localhost 9123
+		./WTF create project1
 		echo testinput > project1/file1.txt
 		echo testinput2 > project1/file2.txt
 		echo testinput3 > project1/file3.txt
 		echo testinput4 > project1/file4.txt
-		./client add project1 file1.txt
-		./client add project1 file2.txt
-		./client add project1 file3.txt
-		./client add project1 file4.txt
-		./client commit project1
-		./client push project1
-		./client destroy project1
-	Server:
-		./server 9123
+		./WTF add project1 file1.txt
+		./WTF add project1 file2.txt
+		./WTF add project1 file3.txt
+		./WTF add project1 file4.txt
+		./WTF commit project1
+		./WTF push project1
+		./WTF destroy project1
+	WTFserver:
+		./WTFserver 9123
 		
 Testcase 24:
 	Code:
-	Client:
-		./client configure localhost 9123
+	WTF:
+		./WTF configure localhost 9123
 		mkdir project
-		./client.out destroy project
-	Server:
-		./server 9123
+		./WTF.out destroy project
+	WTFserver:
+		./WTFserver 9123
 
 Testcase 25:
 	Code:
-	Client:
-		./client configure localhost 9123
-		./client create project
+	WTF:
+		./WTF configure localhost 9123
+		./WTF create project
 		touch project/file1.txt
-		./client.out add project project/file1.txt
+		./WTF.out add project project/file1.txt
 		rm -f project/file1.txt
-		./client.out commit project
-		./client.out push project
-	Server:
-		./server 9123
+		./WTF.out commit project
+		./WTF.out push project
+	WTFserver:
+		./WTFserver 9123
 
 Testcase 26:
 	Code:
-	Client:
-		./client configure localhost 9123
-		./client create project
+	WTF:
+		./WTF configure localhost 9123
+		./WTF create project
 		touch project/file1.txt
-		./client.out add project project/file1.txt
-		./client commit project
+		./WTF.out add project project/file1.txt
+		./WTF commit project
 		touch project/file2.txt
-		./client.out add project project/file2.txt
-		./client commit project
-		./client push project
-	Server:
-		./server 9123
+		./WTF.out add project project/file2.txt
+		./WTF commit project
+		./WTF push project
+	WTFserver:
+		./WTFserver 9123
 
 Testcase 27:
 	Code:
-	Client:
-		./client configure localhost 9123
-		./client create project
-		./client upgrade project
-	Server:
-		./server 9123
+	WTF:
+		./WTF configure localhost 9123
+		./WTF create project
+		./WTF upgrade project
+	WTFserver:
+		./WTFserver 9123
 
 Testcase 28:
 	Code:
-	Client:
-		./client configure localhost 9123
-		./client upgrade project
-	Server:
-		./server 9123
+	WTF:
+		./WTF configure localhost 9123
+		./WTF upgrade project
+	WTFserver:
+		./WTFserver 9123
 
 Testcase 29:
 	Code:
-	Client:
-		./client configure localhost 9123
-		./client create project
-		./client.out update project
-		./client.out upgrade project
-		./client.out update project
-		./client.out upgrade project
-	Server:
-		./server 9123
+	WTF:
+		./WTF configure localhost 9123
+		./WTF create project
+		./WTF.out update project
+		./WTF.out upgrade project
+		./WTF.out update project
+		./WTF.out upgrade project
+	WTFserver:
+		./WTFserver 9123
 
 Testcase 30:
 	Code:
-	Client1:
-		./client configure localhost 9123
-		./client create project
-		./client.out update project
-		./client.out upgrade project
-	Client2:
-		./client configure localhost 9123
-		./client checkout project
+	WTF1:
+		./WTF configure localhost 9123
+		./WTF create project
+		./WTF.out update project
+		./WTF.out upgrade project
+	WTF2:
+		./WTF configure localhost 9123
+		./WTF checkout project
 		touch project/file1.txt
-		./client.out add project project/file1.txt
-		./client commit project
-		./client push project
+		./WTF.out add project project/file1.txt
+		./WTF commit project
+		./WTF push project
 		touch project/file2.txt
-		./client.out add project project/file2.txt
-		./client commit project
-		./client push project
-	Server:
-		./server 9123
+		./WTF.out add project project/file2.txt
+		./WTF commit project
+		./WTF push project
+	WTFserver:
+		./WTFserver 9123
 
 Testcase 31:
 	Code:
-	Client:
-		./client configure localhost 9123
-		./client create project
+	WTF:
+		./WTF configure localhost 9123
+		./WTF create project
 		touch project/file1.txt
-		./client.out add project project/file1.txt
-    	./client.out remove project project/file1.txt
-    	./client.out commit project
-    	./client.out push project
-	Server:
-		./server 9123
+		./WTF.out add project project/file1.txt
+    	./WTF.out remove project project/file1.txt
+    	./WTF.out commit project
+    	./WTF.out push project
+	WTFserver:
+		./WTFserver 9123
 
 Testcase 32:
 	Code:
-	Client:
-		./client configure localhost 9123
-		./client.out create project
-    	./client.out rollback project 4
-	Server:
-		./server 9123
+	WTF:
+		./WTF configure localhost 9123
+		./WTF.out create project
+    	./WTF.out rollback project 4
+	WTFserver:
+		./WTFserver 9123
 
 Testcase 33:
 	Code:
-	Client:
-		./client configure localhost 9123
-		./client.out create project
+	WTF:
+		./WTF configure localhost 9123
+		./WTF.out create project
 		touch project/file1.txt
-		./client.out add project project/file1.txt
-    	./client.out commit project
-    	./client.out push project
-    	./client.out rollback 0
-    	./client.out history project
-	Server:
-		./server 9123
+		./WTF.out add project project/file1.txt
+    	./WTF.out commit project
+    	./WTF.out push project
+    	./WTF.out rollback 0
+    	./WTF.out history project
+	WTFserver:
+		./WTFserver 9123
 
 Testcase 34:
 	Code:
-	Client:
-		./client configure localhost 9123
-		./client.out create project
+	WTF:
+		./WTF configure localhost 9123
+		./WTF.out create project
 		touch project/file1.txt
-		./client.out add project project/file1.txt
-		./client commit project
-		./client push project
+		./WTF.out add project project/file1.txt
+		./WTF commit project
+		./WTF push project
 		touch project/file2.txt
-		./client.out add project project/file2.txt
-		./client commit project
-		./client push project
+		./WTF.out add project project/file2.txt
+		./WTF commit project
+		./WTF push project
 		touch project/file3.txt
-		./client.out add project project/file3.txt
-		./client commit project
-		./client push project
+		./WTF.out add project project/file3.txt
+		./WTF commit project
+		./WTF push project
 		touch project/file4.txt
-		./client.out add project project/file4.txt
-		./client commit project
-		./client push project
-		./client currentversion project
-	Server:
-		./server 9123
+		./WTF.out add project project/file4.txt
+		./WTF commit project
+		./WTF push project
+		./WTF currentversion project
+	WTFserver:
+		./WTFserver 9123
 
 Testcase 35:
 	Code:
-	Client:
-		./client configure localhost 9123
-		./client.out create project
+	WTF:
+		./WTF configure localhost 9123
+		./WTF.out create project
 		touch project/file1.txt
-		./client.out add project project/file1.txt
-		./client commit project
-		./client push project
+		./WTF.out add project project/file1.txt
+		./WTF commit project
+		./WTF push project
 		touch project/file2.txt
-		./client.out add project project/file2.txt
-		./client commit project
-		./client push project
-		./client rollback project 1
-		./client currentversion project
-	Server:
-		./server 9123
+		./WTF.out add project project/file2.txt
+		./WTF commit project
+		./WTF push project
+		./WTF rollback project 1
+		./WTF currentversion project
+	WTFserver:
+		./WTFserver 9123
