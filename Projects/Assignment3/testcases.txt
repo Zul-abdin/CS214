@@ -164,5 +164,86 @@ Testcase 23:
 	Output:
 		The project should no longer exist in the server's folder and remove all active commits for that project
 
+Testcase 24:
+	Test destroying a project not on the server, but a file that exists in the client
+	Input:
+		The project folder exists in the client, but is non-existent in the server
+	Output:
+		The server should send an error to the client
 
+Testcase 25:
+	Deleting a file after adding, then trying to commit and push
+	Input:
+		The project is already created, and a new file is created and added. The new file is then deleted and then commit and push is run.
+	Output:
+		The server should give an error, and the servers files should not change.
 
+Testcase 26:
+	Testing if a project can complete multiple distinct commits followed by a push
+	Input:
+		The project is already created and the client does 2 sequences of adds and commits followed by one push
+	Output:
+		The push should upload all added files into the server
+
+Testcase 27:
+	Trying to upgrade before update or without a .Update
+	Input:
+		The project is already created, and client attempts to directly upgrade
+	Output:
+		An error from client indicating there is no .Update and to call update beforehand
+
+Testcase 28:
+	Attempting to update something not on the server
+	Input:
+		The project is not created, but client still tries to update
+	Output:
+		The server sends an error indicating there is no project of that name
+
+Testcase 29:
+	Updating something already up to date
+	Input:
+		The project created and then attempted to be updated
+	Output:
+		The server should indicate to the client that the files are already up to date
+
+Testcase 30:
+	Updating something more than one version behind
+	Input:
+		The project is created and another client checkouts the project and then pushed to twice, then the original client attempts to update
+	Output:
+		The original client should become up to date
+
+Testcase 31:
+	Trying to commit after adding, but then removing
+	Input:
+		The project is already created and then a new file is added, then removed, but still in the clients project directory. Then attempting to commit.
+	Output:
+		The client should have an empty .Commit and indicate as such
+
+Testcase 32:
+	Doing rollback on an invalid version number
+	Input:
+		The project was just created and the client attempts to rollback to version 4
+	Output:
+		The server should give an error as the currentversion is 0
+
+Testcase 33:
+	Doing a rollback, and then checking history
+	Input:
+		The project is created, pushed to once, and then rolled back to version 0
+	Output:
+		The history should show nothing, as version 0 is a new project
+
+Testcase 34:
+	Pushing updates a few times, then running currentversion
+	Input:
+		The project is created and pushed to 4 times
+	Output:
+		The currentversion should show the versions of each file
+
+Testcase 35:
+	Doing a rollback, and then checking currentversion
+	Input:
+		Project is created, pushed to twice, then rolledback to version 1 and currentversion is called
+	Output:
+		The currentversion should only show files that were in version 1
