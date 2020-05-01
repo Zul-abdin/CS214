@@ -11,9 +11,12 @@
 #include <arpa/inet.h>
 #include <libgen.h>
 #include <time.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <stdio.h>
 int bufferFill(int fd, char* buffer, int bytesToRead);
+void checkResult(char* resultpath, char* result, char* testcase);
+void generateResult(char* command);
 
 int main(int argc, char** argv) {
 	char* serverpath = "./serverFolder/server";
@@ -31,24 +34,70 @@ int main(int argc, char** argv) {
 	}
 	close(clientfd);
 	
-	printf("Running Testcases 0\n");
+	char* resultpath = "result.txt";;
+	generateResult("./clientFolder/client create project1 2 > result.txt");
+	checkResult(resultpath, "Fatal Error: Invalid operation or Improperly Formatted", "Testcase 0");
 	
-	char* resultpath = "./result.txt";;
-	char* test0 = "./clientFolder/client create project1 2 3 > result.txt";
-	char* result0 = "Fatal Error: Invalid operation or Improperly Formatted";
-	system(test0);
-	system(result0);
+	generateResult("./clientFolder/client update 1 2 3 4 > result.txt");
+	checkResult(resultpath, "Fatal Error: Incorrect number of arguments.", "Testcase 1");
+	
+	generateResult("./clientFolder/client configure > result.txt");
+	checkResult(resultpath, "Fatal Error: Incorrect number of arguments.", "Testcase 2");
+	
+	generateResult("./clientFolder/client add 1 2 > result.txt");
+	checkResult(resultpath, "Fatal Error: Project does not exist to add the file", "Testcase 3");
+	
+	generateResult("./clientFolder/client remove 1 2 > result.txt");
+	checkResult(resultpath, "Fatal Error: Project does not exist to remove the file", "Testcase 4");
+
+	generateResult("./clientFolder/client create project1 > result.txt");
+	checkResult(resultpath, "Fatal Error: Configure file is missing or no permissions to Configure file, please call configure before running", "Testcase 5");
+	
+	printf("Fork Test\n");
+	int childpid;
+	childpid = fork();
+	if(childpid == 0){
+		printf("Child process\n");
+		generateResult("cd ./serverFolder");
+		char* argv_list[] = {"./server", "9123", NULL};
+		execv("./server", argv_list);
+		//generateResult("./serverFolder/server 9123");
+	}else if(childpid > 0){
+		generateResult("cd ./clientFolder; ./client configure localhost 9123; ./client create project1; ./client history project1 > result.txt");
+		checkResult(resultpath, "Successful Connection to Server\nWarning: History file is empty, nothing to output", "Testcase 6");
+		kill(childpid, SIGKILL);
+		wait();
+	}else{
+		printf("Fork could not be done, not enough threads\n");	
+	}
+	wait();
+	
+	//generateResult("./clientFolder/client add 1 2 > result.txt");
+	//checkResult(resultpath, "Fatal Error: Project does not exist to add the file", "Testcase 7");
+	
+	return 0;
+}
+
+void generateResult(char* command){
+	system(command);
+}
+
+void checkResult(char* resultpath, char* result, char* testcase){
 	int resultfd = open(resultpath, O_RDONLY);
 	if(resultfd == -1){
 		printf("Something went wrong with this testcase\n");
 	}else{
-		char buffer[150] = {'\0'};
-		bufferFill(resultfd, buffer, strlen(result0));
-		int status = read(resultfd, buffer, strlen(result0));
-		if(strcmp(
+		char buffer[500] = {'\0'};
+		bufferFill(resultfd, buffer, strlen(result));
+		if(strcmp(buffer, result) == 0){
+			printf("%s Passed\n", testcase);
+		}else{
+			printf("%s failed\n", testcase);
+			printf("Your result was:%s", buffer);
+		}
 		close(resultfd);
 	}
-	return 0;
+	remove(resultpath);
 }
 
 int bufferFill(int fd, char* buffer, int bytesToRead){

@@ -1,6 +1,6 @@
 Testcase 0:
 	Code: 
-		./client create project1 2 3
+		./client create project1 2
 Testcase 1:
 	Code:
 		./client update 1 2 3 4
