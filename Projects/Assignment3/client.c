@@ -416,9 +416,9 @@ int main(int argc, char** argv) {
     		
     	}else{
     		if(strlen(argv[1]) == 9 && strcmp(argv[1], "configure") == 0){ //configure
-    			int fd = open("configure", O_WRONLY | O_TRUNC | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
+    			int fd = open(".configure", O_WRONLY | O_TRUNC | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
     			if(fd == -1){
-    				printf("Fatal Error: Could not create the configure file\n");
+    				printf("Fatal Error: Could not create the .configure file\n");
     				return 0;
     			}
     			writeToFile(fd, argv[2]);
@@ -2453,7 +2453,7 @@ Returns a char** that contains:
 	2nd Element = Port
 */
 char** getConfig(){
-	int fd = open("configure", O_RDONLY);
+	int fd = open(".configure", O_RDONLY);
 	if(fd == -1){
 		printf("Fatal Error: Configure file is missing or no permissions to Configure file, please call configure before running\n");
 		return NULL;
