@@ -903,7 +903,6 @@ void upgradeProcess(char* projectName, int upgradefd, int socketfd){
 			printf("Server has not successfully finished upgrade, %s\n", serverResponse_);
 		}
 		free(serverResponse_);
-		printf("Up To Date\n");
 	}else{
 		mNode* temp = mhead;
 		char str[5] = {'\0'};

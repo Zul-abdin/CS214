@@ -1,78 +1,168 @@
 Testcase 0:
+	Testing the input of 4 incorrect arguments
 	Input: 
-		./client create project1 project2
+		4 arguments
 	Output:
 		Fatal Error: Invalid operation or Improperly Formatted
+		
 Testcase 1:
+	Testing the input of more than 4 arguments
 	Input:
-		./client checkout 1 2 3
+		5 arguments
 	Output:
 		Fatal Error: Incorrect number of arguments.
+		
 Testcase 2:
+	Testing the input of less than 3 arguments
 	Input:
-		./client configure
+		2 arguments
 	Output:
 		Fatal Error: Incorrect number of arguments.
+		
 Testcase 3:
+	Testing adding a file to a project that has not been created
 	Input:
-		./client add 1 2 
+		add a file to a project that does not exist
 	Output:
 		Fatal Error: Project does not exist to add the file
+		
 Testcase 4:
+	Testing removing a file to a project that has not been created
 	Input: 
-		./client remove 1 2 
+		remove a file to a project that does not exist
 	Output: 
 		Fatal Error: Project does not exist to remove the file
+		
 Testcase 5:
+	Testing create when the configure file has not been generated
 	Input: 
-		./client create project1
-	Output:
-		Fatal Error: IP address used in configure file does not work, invalid ip address
-Testcase 6:
-	Input:
-		./client update project1
+		any properly formatted create and the project does not already exist locally
 	Output:
 		Fatal Error: Configure file is missing or no permissions to Configure file, please call configure before running
+		
 Testcase 6:
+	Testing if the client creates a new project, if it request the history, it will output nothing but a warning indicating the history file is empty
 	Input: 
-		./client create project1
-		./client history project1
+		The configure file is setup correctly and the client creates a new project on the server and then requests the history and the server is running beforehand
 	Output: 
-		Warning: History file is empty, nothing to output
+		Warning: History file is empty, nothing to output		
 Testcase 7:
+	Testing if the client creates a new project, if it request the currentversion, it will output nothing but a warning indicating the manifest is empty
 	Input:
-		./client create project1
-		./client currentversion project1
+		The configure file is setup correctly and the client creates a new project on the server and then requests the current version and the server is running beforehand
 	Output: 
 		Warning: There are no files in the Manifest
+
 Testcase 8:
+	Testing if the client creates a new project and it tries to add a file that does not exist, it will output an error indicating the file does not exist to add to the manifest
 	Input:
-		./client create project1
-		./client add project1 file1.txt
+		The configure file is setup correctly and the client is able to create a new project and tries to add a file that has not been created 
 	Output: 
 		Fatal Error: File does not exist
+
 Testcase 9:
+	Testing if the client creates a new project and it tries to remove a file that does not exist, it will output a warning indicating the file is not listed in the manifest
 	Input:
-		./client create project1
-		./client remove project1 file1.txt
+		The configure file is setup correctly and the client is able to create a new project and tries to remove a file that has not been added to the manifest
 	Output:
-		Warning: The file is not listed in the Manifest to remove
+		Warning: The File Entry is not listed in the Manifest to remove
+		
 Testcase 10:
+	Testing if the client creates a new project and tries to add a file to the manifest and the file exists, it successfully adds it
 	Input:
-		./client create project1 
-		touch project1/file1.txt
-		./project add project1 file1.txt
+		The configure file is setup correctly and the client is able to create a new project and adds a file that already exists
 	Output:
-		the project1's manifest should have manifest version 0 and have a new entry with l0 project1/file1.txt d41d8cd98f00b204e9800998ecf8427e
+		the project1's manifest should have manifest version 0 and have a new entry with the version l0 and filepath and then the hash of the file indicated by the m5sum of the file
+		
 Testcase 11:
+	Testing if the client tries to create a project that already exists, it should output an error and not overwrite the current project's directory
 	Input:
-		./client create project1
-		./client create project1
+		The configure file is setup correctly and the client is able to create a new project then tries to recreate the same project
 	Output:
 		Fatal Error: Project already exist on client side, please remove before retrying
+		
 Testcase 12:
+	Testing if the client creates a new project and adds a file to the manifest and then tries to add it back to the manifest, it outputs a warning that the file already exists
 	Input:
-		./client create project1
-			
+		The configure file is setup correctly and the client is able to create a new project and adds a file that exists to the Manifest and tries to re-add it to the Manifest
 	Output: 
-	
+		Warning: File entry already existed in the Manifest and therefore could not be added
+Testcase 13:
+	Testing if the client creates a new project and adds a file to the manifest and then tries to commit, it will succesfully make the code "A" and send the .commit to the server
+	Input:
+		The configure file is setup correctly and the client is able to create a new project and adds a file that exists to the Manifest then performs a commit
+	Output:
+		A .commit should be generated alongside the clientid and the version of the client's manifest when it was created (used to verify it in push to see if there has been any changes made to commit) and inside the .commit file should have the code "A" with the filepath and the livehash of the file
+
+Testcase 14:
+	Testing if the client creates a new project and adds a file to the manifest and successfully commits and pushes the changes (Testing A code in commit)
+	Input:
+		The configure file is setup correctly and the client is able to create a new project and add a file that already exist to the Manifest and performs a successful commit and then pushes
+	Output:
+		The server's and client's  Manifest Version should be incremented by one and the file entry is listed in the manifest no longer has the l0 tag but just 0 since it was just appended (if it was modified, the file version will increase) and the server contains the updated files and manifest and contains a tar of the old project in its rollback folder and the history file should contain the changes
+		
+Testcase 15:
+	Testing if the client creates a new project and adds a file to the manifest and successfully commits and pushes the changes then does a modification and does another commit and push (Testing the M code in commit)
+	Input:
+		The client does a successful push and then modifies a file and redoes the commit and push
+	Output:
+		The server's and client's Manifest Version should be incremented by one and the file entry is listed in the Manifest's hash should be changed to reflect the modified changes and the server should contain the updated files and manifest and contains a tar of the old project in its rollback folder and the history file should contain the changes
+		
+Testcase 16:
+	Testing if the client does a successful push and commit and then removes the file from its manifest and does a commit and push, the server's updated (testing the D code in commit)
+	Input:
+		The client does a successful push and then removes the file from the manifest and then does a commit and push
+	Output: 
+		The server's and client's Manifest Version should be incremented by one and the file entry should not be listed in the server's or client's manifest and the server should not contain the file anymore and the manifest and contains a tar of the old project in its rollback folder and the history files should reflect the changes
+		
+Testcase 17:
+	Testing if the client does a successful push and commit and then requests for the history 
+	Input:
+		Client does successful push and then requests the history for that project
+	Output:
+		The output should be the reflected changes from the commits 
+		
+Testcase 18:
+	Testing if the client does a successful push and commit and then requests for the currentversion 
+	Input:
+		Client does successful push and then requests the currentversion for that project
+	Output:
+		The output should be the server's manifest file entries without the hash code (only the file version and filepath)
+
+Testcase 19:
+	Testing if the client can do multiple adds and commit and push these changes to the server
+	Input:
+		Files that already exist and are added to the Client's Manifest then the client calls commit and push 
+	Output:
+		The Server's and client's manifest version should be incremented by one and the file entries should be in both the server's and client's manifest and the server should contain the new files and a rollback folder with the tar of the old project and the history file should reflect what was added in the commit 
+
+Testcase 20:
+	Testing if the client can rollback the version after doing a commit and push
+	Input:
+		Files already exist in the client side and are added to the Client's Manifest and then push and then the client rollbacks to the previous version
+	Output:
+		The server's version should be be reverted to the previous manifest's version before the commit and the files should be reverted and the higher versions are deleted and the history file is reflected back to the previous version's commit 
+		
+Testcase 21:
+	Test if the client rollback the version after doing a commit and push and then performs a update and upgrade
+	Input:
+		A successful rollback occurred and the client calls update and upgrade
+	Output:
+		The client's Manifest should be updated to the server's Manifest and the client should recieve all the files from the server
+
+Testcase 22:
+	Test if checkout works correctly
+	Input:
+		The project is already created on the server and the client calls checkout
+	Output:
+		The client should have the project created with the manifest and files inside being the same as the server's except the client should not contain the rollback or history folder
+		
+Testcase 23:
+	Test if the destroy works correctly
+	Input:
+		The project is already created and has files inside and the client calls destroy
+	Output:
+		The project should no longer exist in the server's folder and remove all active commits for that project
+
+
+

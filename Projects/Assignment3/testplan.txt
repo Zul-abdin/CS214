@@ -1,3 +1,271 @@
+Testcase 0:
+	Code: 
+		./client create project1 2 3
+Testcase 1:
+	Code:
+		./client update 1 2 3 4
+
+Testcase 2: 
+	Code:
+		./client configure
+		
+Testcase 3:
+	Code: 
+		./client add 1 2
+
+Testcase 4:
+	Code:
+		./client remove 1 2
+
+Testcase 5:
+	Code:
+		./client create project1
+
+Testcase 6:
+	Code:
+	Client:
+		./client configure localhost 9123
+		./client create project1
+		./client history project1
+	Server:
+		./server 9123
+
+Testcase 7:
+	Code:
+	Client:
+		./client configure localhost 9123
+		./client create project1
+		./client currentversion project1
+	Server:
+		./server 9123
+		
+Testcase 8:
+	Code:
+	Client:
+		./client configure localhost 9123
+		./client create project1
+		./client add project1 file1.txt
+	Server:
+		./server 9123
+		
+Testcase 9:
+	Code:
+	Client:
+		./client configure localhost 9123
+		./client create project1
+		./client remove project1 file1.txt
+	Server:
+		./server 9123	
+		
+Testcase 10:
+	Code:
+	Client:
+		./client configure localhost 9123
+		./client create project1
+		touch project1/file1.txt
+		./client add project1 file1.txt
+	Server:
+		./server 9123
+		
+Testcase 11:
+	Code:
+	Client:
+		./client configure localhost 9123
+		./client create project1
+		./client create project1
+	Server:
+		./server 9123	
+	
+Testcase 12:
+	Code:
+	Client:
+		./client configure localhost 9123
+		./client create project1
+		touch project1/file1.txt
+		./client add project1 file1.txt
+		./client add project1 file1.txt
+	Server:
+		./server 9123
+		
+Testcase 13:
+	Code:
+	Client:
+		./client configure localhost 9123
+		./client create project1
+		echo testinput > project1/file1.txt
+		./client add project1 file1.txt
+		./client commit project1
+	Server:
+		./server 9123
+
+Testcase 14:
+	Code:
+	Client:
+		./client configure localhost 9123
+		./client create project1
+		echo testinput > project1/file1.txt
+		./client add project1 file1.txt
+		./client commit project1
+		./client push project1
+	Server:
+		./server 9123
+				
+Testcase 15:
+	Code:
+	Client:
+		./client configure localhost 9123
+		./client create project1
+		echo testinput > project1/file1.txt
+		./client add project1 file1.txt
+		./client commit project1
+		./client push project1
+		echo testInputModified > project1/file1.txt
+		./client commit project1
+		./client push project1
+	Server:
+		./server 9123
+		
+Testcase 16:
+	Code:
+	Client:
+		./client configure localhost 9123
+		./client create project1
+		echo testinput > project1/file1.txt
+		./client add project1 file1.txt
+		./client commit project1
+		./client push project1
+		./client remove project1 file1.txt
+		./client commit project1
+		./client push project1
+	Server:
+		./server 9123		
+		
+Testcase 17:
+	Code:
+	Client:
+		./client configure localhost 9123
+		./client create project1
+		echo testinput > project1/file1.txt
+		./client add project1 file1.txt
+		./client commit project1
+		./client push project1
+		./client history project1
+	Server:
+		./server 9123
+
+Testcase 18:
+	Code:
+	Client:
+		./client configure localhost 9123
+		./client create project1
+		echo testinput > project1/file1.txt
+		./client add project1 file1.txt
+		./client commit project1
+		./client push project1
+		./client currentversion project1
+	Server:
+		./server 9123
+
+Testcase 19:
+	Code:
+	Client:
+		./client configure localhost 9123
+		./client create project1
+		echo testinput > project1/file1.txt
+		echo testinput2 > project1/file2.txt
+		echo testinput3 > project1/file3.txt
+		echo testinput4 > project1/file4.txt
+		./client add project1 file1.txt
+		./client add project1 file2.txt
+		./client add project1 file3.txt
+		./client add project1 file4.txt
+		./client commit project1
+		./client push project1
+	Server:
+		./server 9123
+
+Testcase 20:
+	Code:
+	Client:
+		./client configure localhost 9123
+		./client create project1
+		echo testinput > project1/file1.txt
+		echo testinput2 > project1/file2.txt
+		echo testinput3 > project1/file3.txt
+		echo testinput4 > project1/file4.txt
+		./client add project1 file1.txt
+		./client add project1 file2.txt
+		./client add project1 file3.txt
+		./client add project1 file4.txt
+		./client commit project1
+		./client push project1
+		./client rollback project1 0
+	Server:
+		./server 9123
+
+Testcase 21:
+	Code:
+	Client:
+		./client configure localhost 9123
+		./client create project1
+		echo testinput > project1/file1.txt
+		echo testinput2 > project1/file2.txt
+		echo testinput3 > project1/file3.txt
+		echo testinput4 > project1/file4.txt
+		./client add project1 file1.txt
+		./client add project1 file2.txt
+		./client add project1 file3.txt
+		./client add project1 file4.txt
+		./client commit project1
+		./client push project1
+		./client rollback project1 0
+		./client update
+		./client upgrade
+	Server:
+		./server 9123
+
+Testcase 22:
+	Code:
+	Client:
+		./client configure localhost 9123
+		./client create project1
+		echo testinput > project1/file1.txt
+		echo testinput2 > project1/file2.txt
+		echo testinput3 > project1/file3.txt
+		echo testinput4 > project1/file4.txt
+		./client add project1 file1.txt
+		./client add project1 file2.txt
+		./client add project1 file3.txt
+		./client add project1 file4.txt
+		./client commit project1
+		./client push project1
+		rm -rf project1
+		./client checkout project1
+	Server:
+		./server 9123
+		
+Testcase 23:
+	Code:
+	Client:
+		./client configure localhost 9123
+		./client create project1
+		echo testinput > project1/file1.txt
+		echo testinput2 > project1/file2.txt
+		echo testinput3 > project1/file3.txt
+		echo testinput4 > project1/file4.txt
+		./client add project1 file1.txt
+		./client add project1 file2.txt
+		./client add project1 file3.txt
+		./client add project1 file4.txt
+		./client commit project1
+		./client push project1
+		./client destroy project1
+	Server:
+		./server 9123
+		
+
+
+
 (Assume client has already been configured, and server is running and sample.sample is any sample file in testfiles)
 All these files will be contained in a testfiles directory:
     The following were also tested using the following file/directory types:
