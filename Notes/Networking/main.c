@@ -81,7 +81,7 @@ int main() {
      *   - Presentation Layer: Modify/Process data to make it useful and v.v (ex. en-/de-coding, en-/de-cryption, en-/de-compression)
      *   - Session Layer: Manages messages over a number of connections and v.v (ex. sync, timing, multiplexing, sequencing)
      *     - Gets information from Transport layer, using it like a service to get info from Data Link Layer, but does not know how transport layer works
-     *   - Transport Layer: first end-to-end Layer, (ex. sockets are transport-layer structures/abstractions)
+     *   - Transport Layer: first end-to-end Layer, (ex. sockets are transport-layer structures/abstractions, TCP)
      *     - Manages messaging and v.v (getting all of message the the other side quickly, reliably, and efficiently)
      *     - Pieces together information from the Networking Layer and gives it to the session layer requesting information and v.v
      *   - Networking Layer: Determine a route and v.v (ex. router)
@@ -89,6 +89,17 @@ int main() {
      *   - Data Link Layer: Point-to-point sending to (ex. switches)
      *     - Manages delivery to hosts directly connected to and v.v (error check/encoding, identity)
      *   - Physical Layer: Manages translation of bits into something physical that propagates, and v.v. (rate, resiliency, bandwidth)
+     *   <--- LOWEST LAYER
+     *
+     * - Simplified ISO OSI Stack
+     *   <--- HIGHEST LAYER
+     *   - Application Layer: Interacts with user
+     *   - Presentation Layer: Reformat information to make it useful. Ex: encryption/decryption
+     *   - Session Layer: Sync b/w sockets, multiplex b/w sockets, enforce/check for some behavior/info over multiple messages
+     *   - Transport Layer: Message delivery reliably and efficiency. Sockets are transport layer, one socket messages another socket, meaning one transport layer sends, the other recieves
+     *   - Networking Layer: Provides indirect connection / relays traffic (gets bytes from Data-Link Layer and tells it where to send the data)
+     *   - Data Link Layer: Byte Delivery (frame) reliably and efficiently (also allow for multiple users)
+     *   - Physical Layer: Bits to radiation and v.v.
      *   <--- LOWEST LAYER
      *
      * - OOD (Object Oriented Design)

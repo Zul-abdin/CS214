@@ -229,6 +229,20 @@ int main(int argc, char* argv[]) {
      * Binary Semaphore (similar-looking mechanics to a mutex)
      * - no identity restrictions (anyone can 'unlock' it at any time)
      * - no run ordering (any waiting context might unblock on a wait/notify)
+     *
+     * Mechanism.....Primitive
+     * Mutex.........test_and_set
+     * barrier.......fetch_and_decr
+     * Cond Var......cmp_and_swp
+     *
+     * Semaphores: Asynchronous, can incr/dec in any order and thread-safe
+     *   p(): Decrement
+     *   v(): Increment
+     *   Useful in a shared queue where:
+     *   Producers only run the increment function when adding something to the queue
+     *   Consumers only run the decrement function when consuming something from the queue
+     *   Useful for using a synchronization mechanism in signal-handlers
+     *
      */
 
     return 0;
