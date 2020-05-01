@@ -53,18 +53,19 @@ int main(int argc, char** argv) {
 	generateResult("./clientFolder/client create project1 > result.txt");
 	checkResult(resultpath, "Fatal Error: Configure file is missing or no permissions to Configure file, please call configure before running", "Testcase 5");
 	
-	printf("Fork Test\n");
+	printf("Forking to create the server and client\n");
 	int childpid;
 	childpid = fork();
 	if(childpid == 0){
-		printf("Child process\n");
-		generateResult("cd ./serverFolder");
+		chdir("./serverFolder");
+		printf("The directory has changed to server's folder\n");
 		char* argv_list[] = {"./server", "9123", NULL};
 		execv("./server", argv_list);
 		//generateResult("./serverFolder/server 9123");
 	}else if(childpid > 0){
 		generateResult("cd ./clientFolder; ./client configure localhost 9123; ./client create project1; ./client history project1 > result.txt");
-		checkResult(resultpath, "Successful Connection to Server\nWarning: History file is empty, nothing to output", "Testcase 6");
+		char* clientpath = "./clientFolder/result.txt";
+		checkResult(clientpath, "Successful Connection to Server\nWarning: History file is empty, nothing to output\nClient: Terminated Server Connection\n", "Testcase 6");
 		kill(childpid, SIGKILL);
 		wait();
 	}else{

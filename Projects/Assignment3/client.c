@@ -66,6 +66,7 @@ int strcomp(void* string1, void* string2);
 char* generatePath(char* projectName, char* pathToAppend);
 char* doubleStringSize(char* word, int newsize);
 char* generateHashCode(char* filepath);
+int reserveKeywords(char* word);
 
 // File Sending Methods
 void writeToSocketFromFile(int clientfd, char* fileName);
@@ -125,7 +126,7 @@ int main(int argc, char** argv) {
 					char* temp = NULL;
 					readNbytes(socketfd, strlen("FAILURE"), NULL, &temp);
 					if(strcmp(temp, "SUCCESS") == 0){
-						printf("Server successfully located the project, recieving the project\n");
+						//printf("Server successfully located the project, recieving the project\n");
 						metadataParser(socketfd);
 						createDirectories(listOfFiles);
 						writeToFileFromSocket(socketfd, listOfFiles);
@@ -136,6 +137,7 @@ int main(int argc, char** argv) {
 					}
 					free(temp);
 					close(socketfd);
+					printf("Client: Terminated Server Connection\n");
     			}else{
     			
     			}
@@ -151,7 +153,7 @@ int main(int argc, char** argv) {
     				char* temp = NULL;
     				readNbytes(socketfd, strlen("FAILURE"), NULL, &temp);
     				if(strcmp(temp, "SUCCESS") == 0){
-    					printf("Server sucessfully located the project's manifest, recieving the server manifest\n");
+    					//printf("Server sucessfully located the project's manifest, recieving the server manifest\n");
     					metadataParser(socketfd);
     					update(argv[2], socketfd);
     				}else if(strcmp(temp , "FAILURE") == 0){
@@ -161,6 +163,7 @@ int main(int argc, char** argv) {
     				}
     				free(temp);
     				close(socketfd);
+    				printf("Client: Terminated Server Connection\n");
     			}else{
     			
     			}
@@ -169,7 +172,7 @@ int main(int argc, char** argv) {
     				printf("Fatal Error: Project does not exist to upgrade\n");
     				return 0;
     			}
-    			char* conflictFile = generatePath(argv[2], "/Conflict"); //Check later
+    			char* conflictFile = generatePath(argv[2], "/.Conflict"); //Check later
 
     			int conflictFd = open(conflictFile, O_RDONLY);
     			if(conflictFd != -1){
@@ -178,7 +181,7 @@ int main(int argc, char** argv) {
     				free(conflictFile);
     			}else{
     				free(conflictFile);
-    				char* updateFile = generatePath(argv[2], "/Update");
+    				char* updateFile = generatePath(argv[2], "/.Update");
     				int updateFd = open(updateFile, O_RDONLY);
     				if(updateFd == -1){
     					printf("Fatal Error: Please call upgrade before update\n");
@@ -195,7 +198,7 @@ int main(int argc, char** argv) {
     						close(updateFd);
     						remove(updateFile);
     						free(updateFile);
-    						char* removeManifestVersion = generatePath(argv[2], "/serverManifestVersion"); //CHANGE TO HIDDEN LATER
+    						char* removeManifestVersion = generatePath(argv[2], "/.serverManifestVersion"); //CHANGE TO HIDDEN LATER
     						int serverManifestfd = open(removeManifestVersion, O_RDONLY);
     						if(serverManifestfd != -1){
     							char* serverManifestVersion = readFileTillDelimiter(serverManifestfd);
@@ -218,9 +221,10 @@ int main(int argc, char** argv) {
     				if(socketfd > 0){
     					upgradeProcess(argv[2], updateFd, socketfd);
     					close(socketfd);
-    					char* removeManifestVersion = generatePath(argv[2], "/serverManifestVersion"); //CHANGE TO HIDDEN LATER
+    					char* removeManifestVersion = generatePath(argv[2], "/.serverManifestVersion"); //CHANGE TO HIDDEN LATER
 						remove(removeManifestVersion);
 						free(removeManifestVersion);
+						printf("Client: Terminated Server Connection\n");
     				}else{
     				
     				}
@@ -233,7 +237,7 @@ int main(int argc, char** argv) {
     				printf("Fatal Error: Project does not exist for commit\n");
     				return 0;
     			}
-    			char* conflictFile = generatePath(argv[2], "/Conflict"); //Check later
+    			char* conflictFile = generatePath(argv[2], "/.Conflict"); //Check later
     			int conflictFd = open(conflictFile, O_RDONLY);
     			if(conflictFd != -1){
     				printf("Fatal Error: Please resolve Conflicts before commit\n");
@@ -242,7 +246,7 @@ int main(int argc, char** argv) {
     			}else{
     				int notEmpty = 0;
     				free(conflictFile);
-    				char* updateFile = generatePath(argv[2], "/Update");
+    				char* updateFile = generatePath(argv[2], "/.Update");
     				int updateFd = open(updateFile, O_RDONLY);
     				if(updateFd != -1){
     					int read = 0;
@@ -262,7 +266,7 @@ int main(int argc, char** argv) {
 		 					char* temp = NULL;
 							readNbytes(socketfd, strlen("FAILURE"), NULL, &temp);
 							if(strcmp(temp, "SUCCESS") == 0){
-								printf("Server successfully found the Project's Manifest\n");
+								//printf("Server successfully found the Project's Manifest\n");
 								commit(argv[2], socketfd);
 		 					}else if(strcmp(temp , "FAILURE") == 0){
 		 						printf("Fatal Error: Server failed to find the project's manifest\n");
@@ -271,6 +275,7 @@ int main(int argc, char** argv) {
 		 					}
 		 					free(temp);
 		 					close(socketfd);
+		 					printf("Client: Terminated Server Connection\n");
 		 				}
     				}
     				free(updateFile);		
@@ -280,7 +285,7 @@ int main(int argc, char** argv) {
     				printf("Fatal Error: Project does not exist for push\n");
     				return 0;
     			}
-    			char* commitFilepath = generatePath(argv[2], "/commit"); //Check later
+    			char* commitFilepath = generatePath(argv[2], "/.commit"); //Check later
     			int commitfd = open(commitFilepath, O_RDONLY);
     			if(commitfd == -1){
     				printf("Fatal Error: Commit file does not exist or cannot be opened for the project, please call commit before calling push\n");
@@ -294,7 +299,7 @@ int main(int argc, char** argv) {
 			 				char* serverResponse = NULL;
 							readNbytes(socketfd, strlen("FAILURE"), NULL, &serverResponse);
 							if(strcmp(serverResponse, "SUCCESS") == 0){
-								printf("Project was found on the server for push, proceeding with push checks\n");
+								//printf("Project was found on the server for push, proceeding with push checks\n");
 								pushCommit(argv[2], socketfd, commitFilepath);
 							}else if(strcmp(serverResponse, "FAILURE") == 0){
 								printf("Fatal Error: Project does not exist on the server side\n");
@@ -304,6 +309,7 @@ int main(int argc, char** argv) {
 							free(serverResponse);
 			 				remove(commitFilepath);
 			 				close(socketfd);
+			 				printf("Client: Terminated Server Connection\n");
 			 			}
     				}
     			}
@@ -321,7 +327,7 @@ int main(int argc, char** argv) {
 					char* temp = NULL;
 					readNbytes(socketfd, strlen("FAILURE"), NULL, &temp);
 					if(strcmp(temp, "SUCCESS") == 0){
-						printf("Server sucessfully created the project, recieving the Manifest\n");
+						//printf("Server sucessfully created the project, recieving the Manifest\n");
 						metadataParser(socketfd);
 						createProject(argv[2], socketfd);
 					}else if(strcmp(temp , "FAILURE") == 0){
@@ -331,6 +337,7 @@ int main(int argc, char** argv) {
 					}
 					free(temp);
 					close(socketfd);
+					printf("Client: Terminated Server Connection\n");
 				}else{
 				
 				}
@@ -342,7 +349,7 @@ int main(int argc, char** argv) {
 					char* temp = NULL;
 					readNbytes(socketfd, strlen("FAILURE"), NULL, &temp);
 					if(strcmp(temp, "SUCCESS") == 0){
-						printf("Server sucessfully destroyed the project\n");
+						//printf("Server sucessfully destroyed the project\n");
 					}else if(strcmp(temp , "FAILURE") == 0){
 						printf("Fatal Error: Server failed to destroy the project, either project did not exist on server side or had no permissions to delete the project\n");
 					}else{
@@ -350,6 +357,7 @@ int main(int argc, char** argv) {
 					}
 					free(temp);
 					close(socketfd);
+					printf("Client: Terminated Server Connection\n");
 				}else{
 				
 				}
@@ -362,7 +370,7 @@ int main(int argc, char** argv) {
 					readNbytes(socketfd, strlen("FAILURE"), NULL, &temp);
 					if(strcmp(temp, "SUCCESS") == 0){
 						char* response = NULL;
-						printf("Server Succesfully located the project, recieving the files and versions\n");
+						//printf("Server Succesfully located the project, recieving the files and versions\n");
 						metadataParser(socketfd);
 					}else if(strcmp(temp, "FAILURE") == 0){
 						printf("Fatal Error: Server could not locate the project\n");
@@ -371,6 +379,7 @@ int main(int argc, char** argv) {
 					}
 					free(temp);
                close(socketfd);
+               printf("Client: Terminated Server Connection\n");
 				}else{
 						
 				}
@@ -383,7 +392,7 @@ int main(int argc, char** argv) {
     				char* temp = NULL;
 					readNbytes(socketfd, strlen("FAILURE"), NULL, &temp);
 					if(strcmp(temp, "SUCCESS") == 0){
-						printf("Server succesfully located the project, recieving the history file\n");
+						//printf("Server succesfully located the project, recieving the history file\n");
 		 				int historylength = getLength(socketfd);
 		 				if(historylength == 0){
 		 					printf("Warning: History file is empty, nothing to output\n");
@@ -397,6 +406,7 @@ int main(int argc, char** argv) {
 		 			}
     				free(temp);
     				close(socketfd);
+    				printf("Client: Terminated Server Connection\n");
     			}else{
     			
     			}
@@ -416,29 +426,34 @@ int main(int argc, char** argv) {
     			writeToFile(fd, argv[3]);
     			writeToFile(fd, "\n");
     			close(fd);
-    			printf("Sucessfully created Configure file in current directory\n");
+    			//printf("Sucessfully created Configure file in current directory\n");
     			
     		}else if(strlen(argv[1]) == 3 && strcmp(argv[1], "add") == 0){ //Add
+
     			if(directoryExist(argv[2]) == 0){
     				printf("Fatal Error: Project does not exist to add the file\n");
     			}else{
-    				char* modifiedfilepath = NULL;
-    				modifiedfilepath = malloc(sizeof(char) * (strlen(argv[2]) + strlen(argv[3]) + 3));
-    				memset(modifiedfilepath, '\0', sizeof(char) * (strlen(argv[2]) + strlen(argv[3]) + 2));
-    				strcat(modifiedfilepath, argv[2]);
-    				strcat(modifiedfilepath, "/");
-    				strcat(modifiedfilepath, argv[3]);
-    				printf("Modified filepath: %s\n", modifiedfilepath);
-    				char* hashcode = generateHashCode(modifiedfilepath);
-    				if(hashcode == NULL){
-    					printf("Fatal Error: File does not exist\n");
+    				if(reserveKeywords(argv[3]) == 1){
+    					printf("Fatal Error: The file you wish to add is used as metadata, please rename the file before adding\n");
     				}else{
-		 				char* temp = createManifestLine("0", modifiedfilepath, hashcode, 1, 1); 
-		 				modifyManifest(argv[2], modifiedfilepath, 1, temp);    
-		 				free(hashcode);
-		 				free(temp);
-    				}
-    				free(modifiedfilepath);
+    					char* modifiedfilepath = NULL;
+		 				modifiedfilepath = malloc(sizeof(char) * (strlen(argv[2]) + strlen(argv[3]) + 3));
+		 				memset(modifiedfilepath, '\0', sizeof(char) * (strlen(argv[2]) + strlen(argv[3]) + 2));
+		 				strcat(modifiedfilepath, argv[2]);
+		 				strcat(modifiedfilepath, "/");
+		 				strcat(modifiedfilepath, argv[3]);
+		 				//printf("Modified filepath: %s\n", modifiedfilepath);
+		 				char* hashcode = generateHashCode(modifiedfilepath);
+		 				if(hashcode == NULL){
+		 					printf("Fatal Error: File does not exist\n");
+		 				}else{
+			 				char* temp = createManifestLine("0", modifiedfilepath, hashcode, 1, 1); 
+			 				modifyManifest(argv[2], modifiedfilepath, 1, temp);    
+			 				free(hashcode);
+			 				free(temp);
+		 				}
+		 				free(modifiedfilepath);
+    				}  			
     			}
     			
     		}else if(strlen(argv[1]) == 6 && strcmp(argv[1], "remove") == 0){ //Remove
@@ -451,7 +466,7 @@ int main(int argc, char** argv) {
     				strcat(modifiedfilepath, argv[2]);
     				strcat(modifiedfilepath, "/");
     				strcat(modifiedfilepath, argv[3]);
-    				printf("Modified filepath: %s\n", modifiedfilepath);
+    				//printf("Modified filepath: %s\n", modifiedfilepath);
     				modifyManifest(argv[2], modifiedfilepath, 0, NULL);
     				free(modifiedfilepath);
     			}
@@ -464,7 +479,7 @@ int main(int argc, char** argv) {
     				char* serverResponse = NULL;
 					readNbytes(socketfd, strlen("FAILURE"), NULL, &serverResponse);
 					if(strcmp(serverResponse, "SUCCESS") == 0){
-						printf("Server succesfully located the project, server is now checking the version number\n");
+						//printf("Server succesfully located the project, server is now checking the version number\n");
 						free(serverResponse);
 						serverResponse = NULL;
 						readNbytes(socketfd, strlen("FAILURE"), NULL, &serverResponse);
@@ -472,7 +487,7 @@ int main(int argc, char** argv) {
 							char* temp = NULL;
 							readNbytes(socketfd, strlen("FAILURE"), NULL, &temp);
 							if(strcmp(temp, "SUCCESS") == 0){
-								printf("Server successfully rollbacked the project\n");
+								//printf("Server successfully rollbacked the project\n");
 							}else{
 								printf("Error: Could not interpret the server's response: %s\n", temp);
 							}
@@ -491,6 +506,7 @@ int main(int argc, char** argv) {
 						free(serverResponse);
 					}
     				close(socketfd);
+    				printf("Client: Terminated Server Connection\n");
     			}else{
     			
     			}
@@ -532,7 +548,7 @@ void metadataParser(int clientfd){
 		if(buffer[0] == '$'){
 			if(mode == NULL){
 				mode = token;
-				printf("%s\n", mode);
+				//printf("%s\n", mode);
 			}else if(strcmp(mode, "output") == 0){
 				int responseLength = atoi(token);
 				free(token);
@@ -552,7 +568,7 @@ void metadataParser(int clientfd){
 					
 					free(token);
 				}else if(readName == 0){
-					printf("The length of the file path is: %s\n", token);
+					//printf("The length of the file path is: %s\n", token);
 					char* temp = NULL;
 					int filepathlength = atoi(token);
 					readNbytes(clientfd, filepathlength, NULL, &temp);
@@ -568,7 +584,7 @@ void metadataParser(int clientfd){
 				}else{
 					file->filelength = (long long) atoi(token);
 					insertLL(file);
-					printf("The file is %s with path of %s\n", file->filename, file->filepath);
+					//printf("The file is %s with path of %s\n", file->filename, file->filepath);
 					file = (fileNode*) malloc(sizeof(fileNode) * 1);
 					file->next = NULL;
 					file->prev = NULL;
@@ -581,7 +597,7 @@ void metadataParser(int clientfd){
 					free(file);
 					fileNode* temp = listOfFiles;
 					while(temp != NULL){
-						printf("File: %s\n", temp->filename);
+						//printf("File: %s\n", temp->filename);
 						temp = temp->next;
 					}
 					break;
@@ -612,7 +628,7 @@ void metadataParser(int clientfd){
 	Assumes metadataParser was called before to create the listOfFiles
 */
 void createProject(char* directoryName, int socketfd){
-	printf("Attempting to create the directory\n");
+	//printf("Attempting to create the directory\n");
 	int success = makeDirectory(directoryName);
 	if(success){
 		char* manifest = generateManifestPath(directoryName);
@@ -621,7 +637,7 @@ void createProject(char* directoryName, int socketfd){
 		free(manifest);
 		writeToFileFromSocket(socketfd, listOfFiles);
 	}else{
-		printf("Client: Directory Failed to Create\n");
+		printf("Error: Directory Failed to Create\n");
 	}
 }
 
@@ -677,8 +693,8 @@ void update(char* ProjectName, int socketfd){
 	close(manifestfd);
 	mNode* serverHead = NULL;
 	if(sameVersion == 1){
-		char* updateFile = generatePath(ProjectName, "/Update"); //CHANGE TO ./Update for FINAL
-		char* conflictFile =  generatePath(ProjectName, "/Conflict"); //CHANGE TO ./Conflict for FINAL
+		char* updateFile = generatePath(ProjectName, "/.Update"); //CHANGE TO ./Update for FINAL
+		char* conflictFile =  generatePath(ProjectName, "/.Conflict"); //CHANGE TO ./Conflict for FINAL
 		int updateFilefd = open(updateFile, O_RDONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
 		close(updateFilefd);
 		remove(conflictFile);
@@ -735,20 +751,20 @@ void update(char* ProjectName, int socketfd){
 			length = length - read;
 		}while (buffer[0] != '\0' && read != 0 && length != 0);
 	}
-	printf("BEFORE: serverManifest:\n"); //DEBUGGING
-	printMLL(serverHead);
-	printf("BEFORE: clientManifest:\n");
-	printMLL(clientHead);
+	//printf("BEFORE: serverManifest:\n");
+	//printMLL(serverHead);
+	//printf("BEFORE: clientManifest:\n");
+	//printMLL(clientHead);
 	if(serverHead != NULL){
 		quickSort(serverHead, strcomp);
 	}
 	if(clientHead != NULL){
 		quickSort(clientHead, strcomp);
 	}
-	printf("ServerHead:\n");
-	printMLL(serverHead);
-	printf("clientHead:\n");
-	printMLL(clientHead);
+	//printf("ServerHead:\n");
+	//printMLL(serverHead);
+	//printf("clientHead:\n");
+	//printMLL(clientHead);
 	free(curLine); 
 	free(token);
 	compareManifest(serverHead, clientHead, ProjectName, serverVersion);
@@ -761,7 +777,7 @@ void update(char* ProjectName, int socketfd){
 	upgrade performs the necessary checks and then updates the files and updates the client's manifest
 */
 void upgradeProcess(char* projectName, int upgradefd, int socketfd){
-	char* serverManifestfilepath = generatePath(projectName, "/serverManifestVersion");
+	char* serverManifestfilepath = generatePath(projectName, "/.serverManifestVersion");
 	int serverManifestfd = open(serverManifestfilepath, O_RDONLY);
 	char* serverManifestVersion = NULL;
 	free(serverManifestfilepath);
@@ -771,7 +787,7 @@ void upgradeProcess(char* projectName, int upgradefd, int socketfd){
 	 	serverManifestVersion = readFileTillDelimiter(serverManifestfd);
 	 	close(serverManifestfd);
 	}
-	printf("The client stored server version is: %s\n", serverManifestVersion);
+	//printf("The client stored server version is: %s\n", serverManifestVersion);
 	writeToFile(socketfd, "upgrade$");
 	sendLength(socketfd, projectName);
 	
@@ -782,7 +798,7 @@ void upgradeProcess(char* projectName, int upgradefd, int socketfd){
 		free(foundManifestVersion);
 		return;
 	}else{
-		printf("The server send back %s\n", foundManifestVersion);
+		//printf("The server send back %s\n", foundManifestVersion);
 		free(foundManifestVersion);
 		int manifestversionlength = getLength(socketfd);
 		char* currentServerManifestVersion = NULL;
@@ -791,10 +807,10 @@ void upgradeProcess(char* projectName, int upgradefd, int socketfd){
 		memset(temp, '\0', manifestversionlength);
 		memcpy(temp, currentServerManifestVersion, manifestversionlength - 1);
 		free(currentServerManifestVersion);
-		printf("The server's current manifest version: %s\n", temp);
+		//printf("The server's current manifest version: %s\n", temp);
 		if(strcmp(temp, serverManifestVersion) == 0){
 			free(serverManifestVersion);
-			printf("Versions are correct, can continue with upgrade, no changes have been made to the server's manifest since last update\n");
+			//printf("Versions are correct, can continue with upgrade, no changes have been made to the server's manifest since last update\n");
 			free(temp);
 		}else{
 			printf("Fatal Error: Please call update again, the server's manifest for this project has changed since you last updated\n");
@@ -803,7 +819,7 @@ void upgradeProcess(char* projectName, int upgradefd, int socketfd){
 			foundManifestVersion = NULL;
 			readNbytes(socketfd, strlen("FAILURE"), NULL, &foundManifestVersion);
 			if(strcmp(foundManifestVersion, "SUCCESS") == 0){
-				printf("Server Succesfully completed Upgrade\n");
+				//printf("Server Succesfully completed Upgrade\n");
 			}
 			free(foundManifestVersion);
 			free(temp);
@@ -900,7 +916,7 @@ void upgradeProcess(char* projectName, int upgradefd, int socketfd){
 		if(strcmp(serverResponse_, "SUCCESS") == 0){
 			updateManifestVersion(projectName, socketfd);
 		}else{
-			printf("Server has not successfully finished upgrade, %s\n", serverResponse_);
+			printf("Fatal Error: Server has not successfully finished upgrade but client is done, Server's Response: %s\n", serverResponse_);
 		}
 		free(serverResponse_);
 	}else{
@@ -920,17 +936,17 @@ void upgradeProcess(char* projectName, int upgradefd, int socketfd){
 				close(tempfd);
 				remove(temp->filepath);
 			}
-			printf("Sending: %s\n", temp->filepath);
+			//printf("Sending: %s\n", temp->filepath);
 			sendLength(socketfd, temp->filepath);
 			temp = temp->next;
 		}
-		printf("Awaiting files:\n");
+		//printf("Awaiting files:\n");
 		metadataParser(socketfd);
-		printf("Recieving the Files, Changing the these files:\n");
-		printFiles();
-		printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
+		//printf("Recieving the Files, Changing the these files:\n");
+		//printFiles();
+		//printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
 		writeToFileFromSocket(socketfd, listOfFiles); 
-		printf("Updating Local Manifest to the Server's Manifest\n");
+		//printf("Updating Local Manifest to the Server's Manifest\n");
 		char* foundServerManifest = NULL;
 		readNbytes(socketfd, strlen("FAILURE"), NULL, &foundServerManifest);
 		if(strcmp(foundServerManifest, "SUCCESS") == 0){
@@ -945,7 +961,7 @@ void upgradeProcess(char* projectName, int upgradefd, int socketfd){
 	}
 	freeMLL(mhead);
 	free(token);
-	printf("Done\n");
+	//printf("Done\n");
 }
 
 void fileWriteFromSocket(int socketfd, int filelength, char* filepath){
@@ -962,11 +978,11 @@ void fileWriteFromSocket(int socketfd, int filelength, char* filepath){
 			memset(buffer, '\0', (sizeof(buffer) - 1));
 			read = bufferFill(socketfd, buffer, filelength);
 		}
-		printf("The buffer has %s\n", buffer);
+		//printf("The buffer has %s\n", buffer);
 		writeToFile(filefd, buffer);
 		filelength = filelength - read;
 	}
-	printf("Finished reading %s\n", filepath);
+	//printf("Finished reading %s\n", filepath);
 	close(filefd);
 }
 
@@ -1074,7 +1090,7 @@ void commit(char* projectName, int socketfd){
 	int serverManifestLength = listOfFiles->filelength;
 	int serverManifestVersion = readManifest(projectName, socketfd, serverManifestLength, &serverManifest);
 	mNode* clientManifest = NULL;
-	char* manifest = generatePath(projectName, "/Manifest"); //CHANGE MANIFEST
+	char* manifest = generatePath(projectName, "/.Manifest"); //CHANGE MANIFEST
 	int manifestfd = open(manifest, O_RDONLY);
 	if(manifestfd == -1){
 		writeToFile(socketfd, "FAILURE");
@@ -1084,12 +1100,13 @@ void commit(char* projectName, int socketfd){
 		return;
 	}
 	int clientManifestVersion = readManifest(projectName, manifestfd, -1, &clientManifest);
+	close(manifestfd);
 	if(clientManifestVersion == serverManifestVersion){
 		writeToFile(socketfd, "SUCCESS");
-		printf("BEFORE serverManifest:\n"); //DEBUGGING
-		printMLL(serverManifest);
-		printf("BEFORE clientManifest:\n");
-		printMLL(clientManifest);
+		//printf("BEFORE serverManifest:\n"); //DEBUGGING
+		//printMLL(serverManifest);
+		//printf("BEFORE clientManifest:\n");
+		//printMLL(clientManifest);
 		
 		if(serverManifest != NULL){
 			quickSort(serverManifest, strcomp);
@@ -1097,10 +1114,10 @@ void commit(char* projectName, int socketfd){
 		if(clientManifest != NULL){
 			quickSort(clientManifest, strcomp);
 		}
-		printf("serverManifest:\n"); //DEBUGGING
-		printMLL(serverManifest);
-		printf("clientManifest:\n");
-		printMLL(clientManifest);
+		//printf("serverManifest:\n"); //DEBUGGING
+		//printMLL(serverManifest);
+		//printf("clientManifest:\n");
+		//printMLL(clientManifest);
 		
 		commitManifest(serverManifest, clientManifest, projectName, socketfd);
 	}else{
@@ -1137,7 +1154,7 @@ void commitManifest(mNode* serverManifest, mNode* clientManifest, char* projectN
 		writeToFile(socketfd, "UPDATED");
 		return;
 	} 
-	char* commitfilepath = generatePath(projectName, "/commit"); //CHANGE LATER 
+	char* commitfilepath = generatePath(projectName, "/.commit"); //CHANGE LATER 
 	int commitfd = open(commitfilepath, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
 	if(commitfd == -1){
 		printf("Fatal Error: The .Commit file could be not created\n");
@@ -1219,14 +1236,14 @@ void commitManifest(mNode* serverManifest, mNode* clientManifest, char* projectN
 		remove(commitfilepath);
 		writeToFile(socketfd, "FAILURE");
 	}else{
-		char* clientidpath = generatePath("", "clientfd.txt"); //CHANGE LATER to hidden 
+		char* clientidpath = generatePath("", ".clientid.txt"); //CHANGE LATER to hidden 
 		writeToFile(socketfd, "SUCCESS");
 		int clientidfd = open(clientidpath, O_RDONLY);
 		if(clientidfd != -1){
 		 	// Format: clientidtoken$
-			printf("Clientid already exist, reading\n");
+			//printf("Clientid already exist, reading\n");
 		 	char* clientidtoken = readFileTillDelimiter(clientidfd);
-		 	printf("Clientid read: %s\n", clientidtoken);
+		 	//printf("Clientid read: %s\n", clientidtoken);
 			//Sending commit as: numOfBytes$clientidTokennumOfBytes$projectNamenumOfBytes$.commit
 			sendLength(socketfd, clientidtoken);
 			free(clientidtoken);
@@ -1235,14 +1252,14 @@ void commitManifest(mNode* serverManifest, mNode* clientManifest, char* projectN
 			char* serverResponse = NULL;
 			readNbytes(socketfd, strlen("FAILURE"), NULL, &serverResponse);
 			if(strcmp(serverResponse, "SUCCESS") == 0){
-				printf("Server recieved the commit and succesfully stored it\n");
+				//printf("Server recieved the commit and succesfully stored it\n");
 			}else{
-				printf("The server send: %s, not sure what this means\n", serverResponse);
+				printf("Error: The server send: %s, not sure what this means\n", serverResponse);
 			}
 			free(serverResponse);
 		}else{
 			clientidfd = open(clientidpath, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
-			printf("(DEBUGGING): Clientid did not exist, created one\n");
+			//printf("(DEBUGGING): Clientid did not exist, created one\n");
 			
 			char* clientidcomplete = generateClientid();
 			sendLength(socketfd, clientidcomplete);
@@ -1254,20 +1271,20 @@ void commitManifest(mNode* serverManifest, mNode* clientManifest, char* projectN
 			char* serverResponse = NULL;
 			readNbytes(socketfd, strlen("FAILURE"), NULL, &serverResponse);
 			if(strcmp(serverResponse, "SUCCESS") == 0){
-				printf("Server recieved the commit and succesfully stored it\n");
+				//printf("Server recieved the commit and succesfully stored it\n");
 			}else{
-				printf("The server send: %s, not sure what this means\n", serverResponse);
+				printf("Error: The server send: %s, not sure what this means\n", serverResponse);
 			}
 			free(serverResponse);
 		}
-		char* commitVersionfilepath = generatePath(projectName, "/commitManifestVersion"); //CHANGE TO HIDDEN LATER
-		printf("The commit version filepath is: %s\n", commitVersionfilepath);
+		char* commitVersionfilepath = generatePath(projectName, "/.commitManifestVersion"); //CHANGE TO HIDDEN LATER
+		//printf("The commit version filepath is: %s\n", commitVersionfilepath);
 		int commitVersionfilefd = open(commitVersionfilepath, O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR);
 		free(commitVersionfilepath);
 		
 		char* manifestfilepath = generateManifestPath(projectName);
 		char* clientManifestVersion = generateHashCode(manifestfilepath);
-		printf("%s\n", clientManifestVersion);
+		//printf("%s\n", clientManifestVersion);
 		free(manifestfilepath);
 		writeToFile(commitVersionfilefd, clientManifestVersion);
 		free(clientManifestVersion);
@@ -1318,7 +1335,7 @@ char* generateClientid(){
 	gethostname(ipbuffer, sizeof(ipbuffer));
 	struct hostent* localip = gethostbyname(ipbuffer);
 	char* ipaddress = inet_ntoa( *((struct in_addr*) localip->h_addr_list[0]) );
-	printf("Local IP: %s\n", ipaddress);
+	//printf("Local IP: %s\n", ipaddress);
 	srand(time(0));
 	int port = rand() % 65535;
 	char* portholder = malloc(sizeof(char) * 7);
@@ -1377,10 +1394,10 @@ int commitVersionAndHash(mNode* serverNode, mNode* clientNode, int commitfd){
 	}else{
 		int clientVersion = 0;
 		if(clientNode->version[0] == 'l'){
-			printf("Modified Version: %s \n", clientNode->version);
+			//printf("Modified Version: %s \n", clientNode->version);
 			char* number = (clientNode->version + 1);
 			clientVersion = atoi(number);
-			printf("Number version: %d\n", clientVersion);
+			//printf("Number version: %d\n", clientVersion);
 		}else{
 			clientVersion = atoi(clientNode->version);
 		}
@@ -1388,7 +1405,7 @@ int commitVersionAndHash(mNode* serverNode, mNode* clientNode, int commitfd){
 		if(serverVersion >= clientVersion){
 			return 2;
 		}else{
-			printf("Error: Different hashes and Client's version > Server's version\n");
+			printf("Error: Different hashes and Client's version > Server's version, please call update and upgrade to retrieve the latest version\n");
 			return -2;
 		}
 	}
@@ -1465,10 +1482,10 @@ void updateManifestVersion(char* projectName, int socketfd){
 }
 
 void compareManifest(mNode* serverManifest, mNode* clientManifest, char* ProjectName, char* serverVersion){
-	char* updateFile = generatePath(ProjectName, "/Update"); //CHANGE TO ./Update for FINAL
-	char* conflictFile =  generatePath(ProjectName, "/Conflict"); //CHANGE TO ./Conflict for FINAL
-	printf("Updatepath: %s\n", updateFile);
-	printf("Conflictpath: %s\n", conflictFile);
+	char* updateFile = generatePath(ProjectName, "/.Update"); //CHANGE TO ./Update for FINAL
+	char* conflictFile =  generatePath(ProjectName, "/.Conflict"); //CHANGE TO ./Conflict for FINAL
+	//printf("Updatepath: %s\n", updateFile);
+	//printf("Conflictpath: %s\n", conflictFile);
 	mNode* serverCurNode = serverManifest;
 	mNode* clientCurNode = clientManifest;
 	int updateFilefd = open(updateFile, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
@@ -1534,8 +1551,8 @@ void compareManifest(mNode* serverManifest, mNode* clientManifest, char* Project
 	close(updateFilefd);
 	if(conflict == 0){
 		remove(conflictFile);
-		printf("Storing Server's Manifest Version for upgrade\n");
-		char* serverManifestVersionfilepath = generatePath(ProjectName, "/serverManifestVersion");
+		//printf("Storing Server's Manifest Version for upgrade\n");
+		char* serverManifestVersionfilepath = generatePath(ProjectName, "/.serverManifestVersion");
 		int serverManifestfilefd = open(serverManifestVersionfilepath, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
 		free(serverManifestVersionfilepath);
 		writeToFile(serverManifestfilefd, serverVersion);
@@ -1619,19 +1636,20 @@ int checkVersionAndHash(mNode* serverNode, mNode* clientNode, char* projectName,
 }
 /*
 	Searches for:
-		- clientfd
+		- clientid
 		- the Manifest Version when the commit was created and verifies it was the client's Manifest was the same
 */
 int setupPush(char* projectName, char* commitfilepath){
-	char* clientidpath = generatePath("", "clientfd.txt"); //CHANGE LATER to hidden 
+	char* clientidpath = generatePath("", ".clientid.txt"); //CHANGE LATER to hidden 
 	int clientidfd = open(clientidpath, O_RDONLY);
 	if(clientidfd == -1){
 		printf("Fatal Error: could not locate the clientid file to send alongside the commit to push your commit, please redo commit using the commit keyword then push\n");
 		free(clientidpath);
 		return -1;
 	}
+	close(clientidfd);
 	char* storedcommitManifestVersion = NULL;
-	char* commitManifestVersionfilepath = generatePath(projectName, "/commitManifestVersion");
+	char* commitManifestVersionfilepath = generatePath(projectName, "/.commitManifestVersion");
 	int commitManifestVersionfd = open(commitManifestVersionfilepath, O_RDONLY);
 	if(commitManifestVersionfd == -1){
 		printf("Fatal Error: Could not locate the Manifest Version when the commit was made to verify no changes have been made to client's Manifest since last commit, please redo commit using the commit keyowrd then push\n");
@@ -1662,12 +1680,12 @@ int setupPush(char* projectName, char* commitfilepath){
 	Sends the commit over to the server and if it is found, sends the files
 */
 void pushCommit(char* projectName, int socketfd, char* commitfilepath){
-	char* clientidpath = generatePath("", "clientfd.txt"); //CHANGE LATER to hidden 
+	char* clientidpath = generatePath("", ".clientid.txt"); //CHANGE LATER to hidden 
 	int clientidfd = open(clientidpath, O_RDONLY);
 	free(clientidpath);
-	printf("Client is now sending the clientid and commit to server\n");
+	//printf("Client is now sending the clientid and commit to server\n");
 	char* clientidtoken = readFileTillDelimiter(clientidfd);
-	printf("Clientid: %s\n", clientidtoken);
+	//printf("Clientid: %s\n", clientidtoken);
 	close(clientidfd);
 	sendLength(socketfd, clientidtoken); //Project$clientid$commit$
 	sendFileBytes(commitfilepath,socketfd);
@@ -1677,31 +1695,31 @@ void pushCommit(char* projectName, int socketfd, char* commitfilepath){
 	readNbytes(socketfd, strlen("FAILURE"), NULL, &commitFound);
 	if(strcmp(commitFound, "SUCCESS") == 0){
 		free(commitFound);
-		printf("(DEBUG) Server successfully found your commit and expired all the other commits.\n");
+		//printf("(DEBUG) Server successfully found your commit and expired all the other commits.\n");
 		commitFound = NULL;
 		readNbytes(socketfd, strlen("FAILURE"), NULL, &commitFound);
 		if(strcmp(commitFound, "SUCCESS") == 0){
-			printf("Server was able to create the backup and store it in the history folder\n");
-			printf("Server is now waiting for the files to send in the order of the commit and format: bytesOfFile$Filecontent\n");
+			//printf("Server was able to create the backup and store it in the history folder\n");
+			//printf("Server is now waiting for the files to send in the order of the commit and format: bytesOfFile$Filecontent\n");
 			mNode* commitHeads = NULL;
 			int commitfd = open(commitfilepath, O_RDONLY);
 			getCommit(commitfd, &commitHeads);
 			close(commitfd);
-			printf("The commit file contains:\n");
-			printMLL(commitHeads);
+			//printf("The commit file contains:\n");
+			//printMLL(commitHeads);
 			mNode* curFile = commitHeads;
 			while(curFile != NULL){
 				sendFileBytes(curFile->filepath, socketfd);
 				curFile = curFile->next;
 			}
 			freeMLL(commitHeads);
-			printf("(DEBUG) Finished sending all the files to the server\n");
+			//printf("(DEBUG) Finished sending all the files to the server\n");
 			
 			free(commitFound);
 			readNbytes(socketfd, strlen("FAILURE"), NULL, &commitFound);
 			if(strcmp(commitFound, "SUCCESS") == 0){
 				free(commitFound);
-				printf("Server successfully updated everything and is sending the Manifest back\n");
+				//printf("Server successfully updated everything and is sending the Manifest back\n");
 				
 				char* manifest = generateManifestPath(projectName);
 				fileNode* manifestNode = malloc(sizeof(fileNode) * 1);
@@ -1709,12 +1727,12 @@ void pushCommit(char* projectName, int socketfd, char* commitfilepath){
 				manifestNode->prev = NULL;
 				manifestNode->filepath = manifest;
 				int ManifestLength = getLength(socketfd);
-				printf("The Manifest Length is: %d\n", ManifestLength);
+				//printf("The Manifest Length is: %d\n", ManifestLength);
 				manifestNode->filelength = ManifestLength;
 				writeToFileFromSocket(socketfd, manifestNode);
 				free(manifestNode->filepath);
 				free(manifestNode);
-				printf("Succesfully updated the client Manifest\n");
+				//printf("Succesfully updated the client Manifest\n");
 				
 			}else if(strcmp(commitFound, "FAILURE") == 0){
 				printf("Fatal Error: Server failed to update all the files and the push\n");
@@ -1738,7 +1756,7 @@ void pushCommit(char* projectName, int socketfd, char* commitfilepath){
 		printf("Error: Not sure what the server send back %s\n", commitFound);
 		free(commitFound);
 	}
-	printf("Finished with push\n");
+	//printf("Finished with push\n");
 }
 
 /*
@@ -1792,7 +1810,7 @@ int getCommit(int commitfd, mNode** head){
 						mode = 3;
 						curFile->version = token;
 					}else{
-						printf("Warning: The commit file is not properly formatted, %s", token);
+						//printf("Warning: The commit file is not properly formatted, %s", token);
 						mode = -1;
 					}
 					defaultSize = 15;
@@ -1829,7 +1847,7 @@ char* getManifestVersionString(char* projectName){
 	int manifestfd = open(manifest, O_RDONLY);
 	free(manifest);
 	if(manifestfd == -1){
-		printf("Error: Project's Manifest does not exist\n");
+		printf("Fatal Error: Project's Manifest does not exist\n");
 		return NULL;
 	}else{
 		char buffer[100] = {'\0'};
@@ -1961,7 +1979,7 @@ void writeToFileFromSocket(int socketfd, fileNode* files){
 				memset(buffer, '\0', sizeof(buffer));
 				read = bufferFill(socketfd, buffer, filelength);
 			}
-			printf("The buffer has %s\n", buffer);
+			//printf("The buffer has %s\n", buffer);
 			writeToFile(filefd, buffer);
 			
 			filelength = filelength - read;
@@ -1984,10 +2002,10 @@ void writeToSocketFromFile(int clientfd, char* fileName){
 	char buffer[101] = {'\0'}; // Buffer is sized to 101 because we need a null terminated char array for writeToFile method since it performs a strlen
 	do{
 		read = bufferFill(filefd, buffer, (sizeof(buffer) - 1)); 
-		printf("The buffer has %s\n", buffer);
+		//printf("The buffer has %s\n", buffer);
 		writeToFile(clientfd, buffer);
 	}while(buffer[0] != '\0' && read != 0);
-	printf("Finished sending file: %s to Server\n", fileName);
+	//printf("Finished sending file: %s to Server\n", fileName);
 	close(filefd);
 }
 
@@ -2059,10 +2077,10 @@ void sendFile(int clientfd, char* filepath){
 	char buffer[101] = {'\0'}; 
 	do{
 		read = bufferFill(filefd, buffer, (sizeof(buffer) - 1)); 
-		printf("The buffer has %s\n", buffer);
+		//printf("The buffer has %s\n", buffer);
 		writeToFile(clientfd, buffer);
 	}while(buffer[0] != '\0' && read != 0);
-	printf("Finished sending file: %s to client\n", filepath);
+	//printf("Finished sending file: %s to client\n", filepath);
 	close(filefd);
 }
 
@@ -2074,10 +2092,10 @@ void sendFile(int clientfd, char* filepath){
 */
 void modifyManifest(char* projectName, char* filepath, int mode, char* replace){
 	char* manifest = generateManifestPath(projectName);
-	char* manifestTemp = malloc(sizeof(char) * (strlen(manifest) + 5));
-	memset(manifestTemp, '\0', sizeof(char) * (strlen(manifest) + 5));
+	char* manifestTemp = malloc(sizeof(char) * (strlen(manifest) + 11));
+	memset(manifestTemp, '\0', sizeof(char) * (strlen(manifest) + 11));
 	memcpy(manifestTemp, manifest, strlen(manifest));
-	strcat(manifestTemp, "temp");
+	strcat(manifestTemp, "4829484936"); 
 	
 	int manifestfd = open(manifest, O_RDONLY); 
 	
@@ -2087,7 +2105,7 @@ void modifyManifest(char* projectName, char* filepath, int mode, char* replace){
 	}
 	int tempmanifestfd = open(manifestTemp, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
 	if(tempmanifestfd == -1){
-		printf("File already exists somehow\n");
+		//printf("Fatal Error: The temporarily Manifest already exist\n");
 	}
 	int defaultSize = 25;
 	char* token = malloc(sizeof(char) * (defaultSize + 1));
@@ -2131,7 +2149,7 @@ void modifyManifest(char* projectName, char* filepath, int mode, char* replace){
 							temppos++;
 						}
 					}
-					printf("%s\n", temp);
+					//printf("%s\n", temp);
 					free(temp);
 				}
 				
@@ -2190,12 +2208,12 @@ void modifyManifest(char* projectName, char* filepath, int mode, char* replace){
 		Format: ./projectName/Manifest
 */
 char* generateManifestPath(char* projectName){
-	char* manifest = malloc(sizeof(char) * strlen(projectName) + 3 + strlen("/Manifest")); //CHANGE LATER
-	memset(manifest, '\0', sizeof(char) * strlen(projectName) + 3 + strlen("/Manifest")); //CHANGE LATER
+	char* manifest = malloc(sizeof(char) * strlen(projectName) + 3 + strlen("/.Manifest")); //CHANGE LATER
+	memset(manifest, '\0', sizeof(char) * strlen(projectName) + 3 + strlen("/.Manifest")); //CHANGE LATER
 	manifest[0] = '.';
 	manifest[1] = '/';
 	memcpy(manifest + 2, projectName, strlen(projectName));
-	strcat(manifest, "/Manifest");
+	strcat(manifest, "/.Manifest");
 	return manifest;
 }
 
@@ -2246,7 +2264,7 @@ char* createManifestLine(char* version, char* filepath, char* hashcode, int loca
 		memcpy(line+strlen(version) + 1 + strlen(filepath) + 1, hashcode, strlen(hashcode));
 	}
 	line[strlen(line)] = '\n';
-	printf("Inserting:%s", line);
+	//printf("Inserting:%s", line);
 	return line;
 }
 
@@ -2271,11 +2289,13 @@ char* generateHashCode(char* filepath){
 		}while(buffer[0] != '\0' && read != 0);
 		MD5_Final (hash, &mdHash);
 		int i = 0;
+		/*
 		printf("The hash for this file is: ");
 		for(i = 0; i < MD5_DIGEST_LENGTH; i++){
 			printf("%02x", (unsigned char) hash[i]);
 		}
 		printf("\n");
+		*/
 		char* hexhash = (char *) malloc(sizeof(char) * ((MD5_DIGEST_LENGTH * 2) + 1));
 		memset(hexhash, '\0', sizeof(char) * ((MD5_DIGEST_LENGTH * 2) + 1));
 		int previous = 0;
@@ -2312,7 +2332,7 @@ int makeDirectory(char* directoryPath){
 		printf("Warning: Directory could not be created\n");
 		return 0;
 	}else{
-		printf("Directory Created\n");
+		//printf("Directory Created\n");
 		return 1;
 	}
 }
@@ -2362,6 +2382,20 @@ void insertLL(fileNode* node){
 		temp->next = node;
 		node->prev = temp;
 	}
+}
+
+int reserveKeywords(char* word){
+	char* reserveKeyword[] = {".Manifest", ".History", ".Manifest4829484936", ".serverManifestVersion", ".commitManifestVersion", ".Update", ".Commit", ".Conflict"};
+	int i;
+	for(i = 0; i < 8; i++){
+		if(strcasecmp(word, reserveKeyword[i]) == 0){
+			return 1;
+		}
+	}
+	if(strlen(word) >= strlen(".rollback") && strncasecmp(word, ".rollback", strlen(".rollback")) == 0){
+		return 1;
+	}
+	return 0;
 }
 
 int setupConnection(){
@@ -2457,6 +2491,7 @@ char** getConfig(){
 			}
 		}
 	}while((buffer[0] != '\0' && finished == 0) && read != 0);
+	close(fd);
 	return information;
 }
 void printFiles(){
