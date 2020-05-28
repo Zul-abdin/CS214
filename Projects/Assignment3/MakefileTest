@@ -1,0 +1,14 @@
+all:
+	gcc -lssl -lcrypto client.c -o client; gcc -lpthread -lssl -lcrypto server.c -o server
+
+clean:
+	rm -f client; rm -f server
+
+test: client server
+	gcc -lssl -lcrypto client.c -o ./client/client; gcc -lpthread -lssl -lcrypto server.c -o ./server/server
+
+client:
+	mkdir client;
+
+server:
+	mkdir server;
